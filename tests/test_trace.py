@@ -123,3 +123,58 @@ async def test_terminal_contacts_never_frozen_or_released(tmp_path):
     result = await Tracer(graph, lifecycle, check, mode='strict').trace('a0', last_clean_seq=0)
     assert lifecycle.state('a1') == 'ended'
     assert result['confirmed'] == []
+
+
+async def test_strict_precautionary_freeze_still_confirms_and_continues(tmp_path):
+    graph = TrustGraph()
+    lifecycle = Lifecycle(['a0', 'a1', 'a2'])
+    log = EventLog(tmp_path / 'events.jsonl')
+    add(log, graph, 'a0', 'write', 'x', 1)
+    add(log, graph, 'a1', 'read', 'x', 2)
+    add(log, graph, 'a1', 'write', 'y', 3)
+    add(log, graph, 'a2', 'read', 'y', 4)
+    observed = []
+
+    async def check(agent):
+        observed.append((agent, lifecycle.state(agent)))
+        return {'label': 'violation', 'confidence': 1, 'uncertain': False}
+
+    result = await Tracer(graph, lifecycle, check, mode='strict').trace('a0', last_clean_seq=0)
+    # a1 was precautionary-frozen by the strict ring, then CONFIRMED anyway:
+    # poison recorded, frontier extended to a2, also frozen+confirmed
+    assert observed == [('a1', 'frozen'), ('a2', 'frozen')]
+    assert result['confirmed'] == ['a1', 'a2']
+    assert lifecycle.state('a1') == 'frozen' and lifecycle.state('a2') == 'frozen'
+
+
+async def test_operator_frozen_agents_not_autoreleased(tmp_path):
+    for label in ['clean', 'drift']:
+        graph = TrustGraph()
+        lifecycle = Lifecycle(['a0', 'a1'])
+        log = EventLog(tmp_path / f'{label}.jsonl')
+        add(log, graph, 'a0', 'write', 'x', 1)
+        add(log, graph, 'a1', 'read', 'x', 2)
+        # operator froze a1 before the trace ran: this trace must not release it
+        lifecycle.transition('a1', 'freeze')
+
+        async def check(agent):
+            return {'label': label, 'confidence': .95, 'uncertain': False}
+
+        await Tracer(graph, lifecycle, check, mode='strict').trace('a0', last_clean_seq=0)
+        assert lifecycle.state('a1') == 'frozen', label
+
+
+async def test_killed_contacts_skipped_like_ended(tmp_path):
+    graph = TrustGraph()
+    lifecycle = Lifecycle(['a0', 'a1'])
+    log = EventLog(tmp_path / 'events.jsonl')
+    add(log, graph, 'a0', 'write', 'x', 1)
+    add(log, graph, 'a1', 'read', 'x', 2)
+    lifecycle.transition('a1', 'kill')
+
+    async def check(agent):
+        return {'label': 'violation', 'confidence': 1, 'uncertain': False}
+
+    result = await Tracer(graph, lifecycle, check, mode='strict').trace('a0', last_clean_seq=0)
+    assert lifecycle.state('a1') == 'killed'
+    assert result['confirmed'] == []
