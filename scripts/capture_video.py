@@ -166,6 +166,10 @@ def main() -> int:
          "static"),
         ("live-catch-SYNTHETIC-DEV",
          f"{args.base}/?run=pilot-0", 15, "board-events"),
+        ("split-race-SYNTHETIC-DEV",
+         f"{args.base}/?mode=split&v=12", 20, "badge"),
+        ("everyday-drift-SYNTHETIC-DEV",
+         f"{args.base}/?run=drift-demo", 20, "steer"),
         ("charts-SYNTHETIC-DEV", urls["charts"], 10, "static"),
         ("receipt-SYNTHETIC-DEV", urls["receipt"], 10, "static"),
         ("reproduce-proof-SYNTHETIC-DEV", urls["reproduce-proof"], 15,
@@ -188,44 +192,57 @@ def main() -> int:
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
         for name, url, seconds, kind in beats:
-            if kind in ("board", "board-events"):
-                assert_board(url, kind == "board-events")
-            context = browser.new_context(
-                viewport={"width": 1440, "height": 900},
-                record_video_dir=str(out / "_raw"),
-                record_video_size={"width": 1440, "height": 900})
-            page = context.new_page()
-            page.goto(url, wait_until="domcontentloaded")
-            if kind == "board":
-                # board label must be loaded, not 'loading run…'
-                page.wait_for_function(
-                    "!document.getElementById('run-name').textContent"
-                    ".startsWith('loading')", timeout=10000)
-            if kind == "board-events":
-                # event counter must be non-empty before recording
-                page.wait_for_function(
-                    "document.getElementById('ticker').children.length > 0",
-                    timeout=15000)
-            page.wait_for_timeout(int(seconds * 1000))
-            context.close()
-            saved = sorted((out / "_raw").glob("*.webm"),
-                           key=lambda p: p.stat().st_mtime)[-1]
-            target = out / f"{name}.webm"
-            shutil.move(str(saved), target)
-            print(f"captured {target.name} ({target.stat().st_size} bytes, "
-                  f"{seconds}s)")
+            try:
+                capture_one(pw, name, url, seconds, kind, out)
+            except (SystemExit, AssertionError) as error:
+                print(f"SKIPPED: {name}: {error}")
+                continue
         browser.close()
-
-    # blocked beats reported, never faked
-    if (RUNS / "pilot-0" / "metrics" / "all-arms.json").is_file() is False:
-        skipped.append("split-race: needs all-arms.json on /artifacts "
-                       "allowlist (engine-integration)")
-    skipped.append("everyday-drift: needs an actual drift-scenario recording "
-                   "(U9 drift variant) — outbreak clip is never relabeled")
     for note in skipped:
         print("SKIPPED:", note)
     shutil.rmtree(out / "_raw", ignore_errors=True)
     return 0
+
+
+def capture_one(pw, name, url, seconds, kind, out):
+    """One browser per beat so an abort never loses the remaining beats."""
+    browser = pw.chromium.launch()
+    if kind in ("board", "board-events"):
+        assert_board(url, kind == "board-events")
+    context = browser.new_context(
+        viewport={"width": 1440, "height": 900},
+        record_video_dir=str(out / "_raw"),
+        record_video_size={"width": 1440, "height": 900})
+    page = context.new_page()
+    page.goto(url, wait_until="domcontentloaded")
+    if kind == "board":
+        # board label must be loaded, not 'loading run…'
+        page.wait_for_function(
+            "!document.getElementById('run-name').textContent"
+            ".startsWith('loading')", timeout=10000)
+    if kind == "board-events":
+        # event counter must be non-empty before recording
+        page.wait_for_function(
+            "document.getElementById('ticker').children.length > 0",
+            timeout=15000)
+    if kind == "badge":
+        page.wait_for_function(
+            "document.getElementById('synthetic-badge')"
+            ".classList.contains('on')", timeout=15000)
+    if kind == "steer":
+        # everyday beat: an ACTUAL recorded steer event must appear
+        page.wait_for_function(
+            "document.getElementById('ticker').textContent"
+            ".includes('steer')", timeout=20000)
+    page.wait_for_timeout(int(seconds * 1000))
+    context.close()
+    saved = sorted((out / "_raw").glob("*.webm"),
+                   key=lambda p: p.stat().st_mtime)[-1]
+    target = out / f"{name}.webm"
+    shutil.move(str(saved), target)
+    print(f"captured {target.name} ({target.stat().st_size} bytes, "
+          f"{seconds}s)")
+    browser.close()
 
 
 if __name__ == "__main__":

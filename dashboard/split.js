@@ -1,10 +1,8 @@
-/* Split view (U13): three arms from the CANONICAL U9 pilot all-arms output
-   (experiments/committed/runs/pilot-0/metrics/all-arms.json via the engine
-   /artifacts allowlist) plus each run's retained events for the actual
-   policy. Values shown are the evaluator's per-arm final infected/R with an
-   explicit "final" citation; per-arm time series require the U10 replay_arm
-   (engine-integration) and are not improvised here. Agents initialize clean
-   and derive lifecycle from the run's retained events + controls. */
+/* Split view (U13): three counterfactual DERIVED snapshots of the canonical
+   pilot-0 recording (derived-<arm> folders written by
+   scripts/make_capture_preps.py via canonical harness.arms.replay_arm).
+   Per panel: retained events + controls derive lifecycle at time-since-
+   poisoning; R is the arm's final metrics.r_mean, cited as final. */
 "use strict";
 
 (() => {
@@ -12,18 +10,20 @@
   const wrap = document.getElementById("split");
   const POISON = "#ff5d5d", CLEAN = "#4ecf8d", DIM = "#39434e",
     FROZEN = "#ffd27a";
-  const ARMS = ["no-defense", "prompt-only", "verify"];
-  const params = new URLSearchParams(location.search);
-  const run = params.get("run") || "pilot-0";
+  const ARMS = ["derived-no-defense", "derived-prompt-only",
+    "derived-verify"];
+  const LABEL = { "derived-no-defense": "no-defense",
+    "derived-prompt-only": "prompt-only", "derived-verify": "verify" };
   const panels = ARMS.map((name) => {
     const p = document.createElement("div");
     p.className = "panel";
-    p.innerHTML = `<h3>${name}<span data-role="t"></span></h3>
+    p.innerHTML = `<h3>${LABEL[name]}<span data-role="t"></span></h3>
       <div class="graph"></div>
-      <div class="pcount">infected <b data-role="infected">—</b>
-       · frozen <b data-role="frozen">—</b>
+      <div class="pcount">since poisoning <b data-role="t2p">—</b>
+       · infected <b data-role="infected">—</b>
+       · frozen <b data-role="frozen">0</b>
        · R <b data-role="r">—</b> <span data-role="rsrc" class="src">final
-       metrics all-arms.json</span></div>`;
+       metrics.r_mean</span></div>`;
     wrap.appendChild(p);
     return {
       el: p, name,
@@ -44,78 +44,45 @@
         ],
         layout: { name: "grid", fit: true, padding: 20 },
       }),
+      events: [], controls: [], poisoned_at: null, r: undefined,
     };
   });
 
-  async function json_or_null(url) {
-    const res = await fetch(url);
-    return res.ok ? res.json() : null;
+  async function load(name) {
+    const res = await fetch(`/snapshot?run=${encodeURIComponent(name)}`);
+    if (!res.ok) throw new Error(`run ${name} missing`);
+    return res.json();
   }
 
-  Promise.all([
-    json_or_null(`/artifacts/${run}/metrics/all-arms.json`),
-    json_or_null(`/snapshot?run=${encodeURIComponent(run)}`),
-    json_or_null(`/events?run=${encodeURIComponent(run)}`),
-  ]).then(([allArms, snap, evs]) => {
-    if (!allArms) throw new Error(
-      "all-arms.json not published on /artifacts yet (engine-integration "
-      + "allowlist) — split shows the actual-policy board only");
+  Promise.all(ARMS.map(load)).then((snaps) => {
     document.getElementById("run-name").textContent =
-      `${run}: 3 of 8 arms (synthetic-development)`;
+      "three-arm split race (pilot-0 counterfactuals, "
+      + "synthetic-development)";
     document.getElementById("synthetic-badge").classList.add("on");
-
-    // shared agents/graph from the run's real snapshot (engine shape)
-    const agents = snap?.agents
-      || Object.fromEntries((snap?.graph?.nodes || [])
-        .map((n) => [String(n.id ?? n).replace(/^agent:/, ""), "clean"]));
-    const edges = (snap?.edges || (snap?.graph?.edges || []).map((e) => ({
-      source: String(e.source).replace(/^agent:/, ""),
-      target: String(e.target).replace(/^agent:/, ""),
-    }))).filter((e) => agents[e.source] && agents[e.target]);
-
-    // actual-policy retention over the recorded stream, if served
-    let retainedEvents = [];
-    if (evs) {
-      const reader = evs.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      const pump = () => {
-        let idx;
-        while ((idx = buf.indexOf("\n\n")) >= 0) {
-          const chunk = buf.slice(0, idx); buf = buf.slice(idx + 2);
-          const data = chunk.split("\n")
-            .filter((l) => l.startsWith("data: "))
-            .map((l) => l.slice(6)).join("");
-          if (!data || data === "[done]") continue;
-          try {
-            const o = JSON.parse(data);
-            if (o.kind === "infection" || o.kind === "freeze"
-                || o.kind === "release") retainedEvents.push(o);
-          } catch { /* tolerate */ }
-        }
-      };
-      // drain what's buffered; historical streams end on their own
-      (async () => {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += dec.decode(value, { stream: true });
-          pump();
-        }
-        pump();
-      })();
-    }
-
-    panels.forEach((p) => {
-      const els = Object.keys(agents).map((id) => ({
+    snaps.forEach((snap, i) => {
+      const p = panels[i];
+      const els = Object.keys(snap.agents).map((id) => ({
         group: "nodes", data: { id }, classes: "",
       }));
-      for (const [j, e] of edges.entries()) {
+      for (const [j, e] of (snap.edges || []).entries()) {
         els.push({ group: "edges", data: {
-          id: `e${j}`, source: e.source, target: e.target } });
+          id: `e${i}-${j}`, source: e.source, target: e.target } });
       }
       p.cy.add(els.length ? els : [{ group: "nodes", data: { id: "—" } }]);
+      p.counters = Object.fromEntries(
+        (snap.counters || []).map((c) => [c.source.split(".").pop(),
+                                          c.value]));
+      p.events = (snap.events || [])
+        .filter((e) => ["infection", "freeze", "release"].includes(e.kind));
+      p.controls = snap.controls || [];
+      p.poisoned_at = Math.min(...p.events
+        .filter((e) => e.kind === "infection")
+        .map((e) => e.elapsed ?? 0), Infinity);
+      if (!isFinite(p.poisoned_at)) p.poisoned_at = null;
+      p.provenance = snap.provenance || {};
     });
+    const maxT = Math.max(1, ...panels.flatMap((p) =>
+      p.events.map((e) => e.elapsed || 0)));
     const fitAll = () => panels.forEach((p) => {
       p.cy.resize();
       p.cy.layout({ name: "cose", fit: true, padding: 20 }).run();
@@ -131,38 +98,43 @@
     const dur = 30000;
     const t0 = performance.now();
     (function step(now) {
-      const relT = ((now - t0) / dur) * 60;  // fixture window 0..60s
-      clock.textContent = `t = ${relT.toFixed(1)}s (since poisoning)`;
-      scrub.value = Math.round((relT / 60) * 1000);
-      // actual-policy retention over the recorded stream
-      const infected = new Set(), frozen = new Set();
-      for (const ev of retainedEvents) {
-        if ((ev.elapsed ?? 0) > relT) break;
-        if (ev.kind === "infection") infected.add(ev.agent_id);
-        if (ev.kind === "freeze") frozen.add(ev.agent_id);
-        if (ev.kind === "release") frozen.delete(ev.agent_id);
-      }
-      panels.forEach((p) => {
-        const arm = allArms[p.name];
-        p.cy.nodes().forEach((n) => {
-          n.removeClass("infected frozen");
-          if (frozen.has(n.id())) n.addClass("frozen");
-          else if (infected.has(n.id())) n.addClass("infected");
-        });
-        p.el.querySelector('[data-role="t"]').textContent =
-          `+${relT.toFixed(1)}s`;
-        p.el.querySelector('[data-role="infected"]').textContent =
-          infected.size;
-        p.el.querySelector('[data-role="frozen"]').textContent =
-          frozen.size;
-        p.el.querySelector('[data-role="r"]').textContent =
-          arm && arm.r_mean !== null && arm.r_mean !== undefined
-            ? arm.r_mean.toFixed(2) : "unmeasured";
-      });
-      if (relT < 60) requestAnimationFrame(step);
+      const taskT = ((now - t0) / dur) * maxT;   // task-start clock
+      clock.textContent = `t = ${taskT.toFixed(1)}s (task start)`;
+      scrub.value = Math.round((taskT / maxT) * 1000);
+      panels.forEach((p) => applyAt(p, taskT));
+      if (taskT < maxT) requestAnimationFrame(step);
     })(t0);
   }).catch((err) => {
     wrap.innerHTML = `<div class="panel"><h3>Split unavailable</h3>
       <div class="pcount">${err.message}</div></div>`;
   });
+
+  function applyAt(p, taskT) {
+    const t = p.poisoned_at === null ? taskT : p.poisoned_at + taskT;
+    const infected = new Set(), frozen = new Set();
+    const stream = [...p.events, ...p.controls]
+      .filter((c) => c.elapsed !== undefined)
+      .sort((a, b) => (a.elapsed ?? 0) - (b.elapsed ?? 0));
+    for (const ev of stream) {
+      if ((ev.elapsed ?? 0) > t) break;
+      if (ev.kind === "infection") infected.add(ev.agent_id);
+      if (ev.kind === "freeze") frozen.add(ev.agent_id);
+      if (ev.kind === "release") frozen.delete(ev.agent_id);
+    }
+    p.cy.nodes().forEach((n) => {
+      n.removeClass("infected frozen");
+      if (frozen.has(n.id())) n.addClass("frozen");
+      else if (infected.has(n.id())) n.addClass("infected");
+    });
+    p.el.querySelector('[data-role="t"]').textContent =
+      `+${taskT.toFixed(1)}s`;
+    p.el.querySelector('[data-role="t2p"]').textContent =
+      p.poisoned_at === null ? "unmeasured" : `${taskT.toFixed(1)}s`;
+    p.el.querySelector('[data-role="infected"]').textContent = infected.size;
+    p.el.querySelector('[data-role="frozen"]').textContent = frozen.size;
+    const r = p.counters?.r_mean;
+    p.el.querySelector('[data-role="r"]').textContent =
+      infected.size === 0 ? "unmeasured" :
+      (typeof r === "number" ? r.toFixed(2) : "—");
+  }
 })();
