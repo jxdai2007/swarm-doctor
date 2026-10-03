@@ -31,6 +31,9 @@ openrouter:
 jev:
   model: typesafe/jev-1.13
   timeout_seconds: 10.0
+  prompt_price_per_token: '0.000000042'
+  completion_price_per_token: '0'
+  context_limit: 32000
 experiments:
   pilot_seeds:
   - 0
