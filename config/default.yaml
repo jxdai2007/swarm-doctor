@@ -10,6 +10,11 @@ radius_confidence_threshold: 0.6
 periodic_review_steps: 5
 drift_escalation_count: 3
 response_mode: verify
+grader_case_timeout_seconds: 2.0
+grader_startup_allowance_seconds: 10.0
+grader_timeout_seconds: 54.0
+omp_transport_timeout_seconds: 30.0
+omp_finish_transport_timeout_seconds: 59.0
 adapter_timeout_seconds: 10.0
 model_timeout_seconds: 30.0
 kimi:
