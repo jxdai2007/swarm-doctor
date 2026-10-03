@@ -4,6 +4,7 @@ data, no timestamps/fonts), plus the exact data JSON beside each figure.
 """
 from __future__ import annotations
 
+import html
 import json
 from pathlib import Path
 
@@ -21,6 +22,7 @@ def _line(pts, color, width=2):
 
 
 def _text(x, y, s, size=11, fill="#e8edf2", anchor="start"):
+    s = html.escape(str(s), quote=True)
     return (f'<text x="{x}" y="{y}" font-family="monospace" font-size="{size}" '
             f'fill="{fill}" text-anchor="{anchor}">{s}</text>')
 
@@ -71,11 +73,17 @@ def delay_damage(points: list[dict], *, width=640, height=360) -> tuple[str, str
 
 
 def r_bar(per_arm: dict[str, dict], *, width=640, height=360) -> tuple[str, str]:
-    """R per arm (mean + CI whiskers) against the containment line at R=1."""
+    """R per arm (mean + CI whiskers when measured) against the line at R=1.
+    A measured mean with unmeasured CI (single run) draws the bar honestly
+    without invented whiskers; the data sidecar records ci_measured."""
     arms = sorted(k for k, v in per_arm.items() if v.get("mean") is not None)
     unmeasured = sorted(k for k, v in per_arm.items() if v.get("mean") is None)
-    r_max = max([1.0] + [v.get("ci95", [v["mean"]])[-1] for v in per_arm.values()
-                         if v.get("mean") is not None])
+    hi = [v.get("ci95", [v["mean"]])[-1] for v in per_arm.values()
+          if v.get("mean") is not None and v.get("ci95")]
+    r_max = max([1.0] + [h if h is not None else v["mean"]
+                         for v, h in zip(
+                             [v for v in per_arm.values()
+                              if v.get("mean") is not None], hi)])
     plot_w, plot_h = width - 110, height - 70
 
     def y(r):
@@ -88,14 +96,18 @@ def r_bar(per_arm: dict[str, dict], *, width=640, height=360) -> tuple[str, str]
         v = per_arm[arm]
         cx = 40 + bar_w * (i + 0.5)
         mean_y = y(v["mean"])
-        body.append(_line([(cx, y(v["ci95"][0])), (cx, y(v["ci95"][1]))],
-                          "#6fb4ff", 3))
+        if v.get("ci95"):
+            body.append(_line([(cx, y(v["ci95"][0])), (cx, y(v["ci95"][1]))],
+                              "#6fb4ff", 3))
         body.append(f'<rect x="{cx - bar_w * 0.3:.2f}" y="{mean_y:.2f}" '
                     f'width="{bar_w * 0.6:.2f}" height="{height - 40 - mean_y:.2f}" '
                     f'fill="#6fb4ff" fill-opacity="0.35"/>')
         body.append(_text(cx, height - 24, arm, 10, "#e8edf2", "middle"))
         body.append(_text(cx, mean_y - 8, f'{v["mean"]:.2f}', 10, "#6fb4ff",
                           "middle"))
+        if not v.get("ci95"):
+            body.append(_text(cx, mean_y - 20, "CI unmeasured (single run)",
+                              9, "#9fb0bf", "middle"))
     for j, arm in enumerate(unmeasured):
         body.append(_text(40, 30 + 14 * j,
                           f"{arm}: R unmeasured (zero infections)", 10,
