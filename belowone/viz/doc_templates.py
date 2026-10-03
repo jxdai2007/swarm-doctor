@@ -10,14 +10,17 @@ from pathlib import Path
 
 
 def load_metrics(paths: list[Path]) -> dict:
-    """{run_name: {token_key: value}}. metrics.json (U9 authoritative
-    evaluation) maps to metrics.<key>; snapshot.json counters map to their
+    """Token sources. analysis.json (U16 aggregate) maps doc_metrics
+    directly ({arm.metrics.key} per-run means / cross-seed R); metrics.json
+    maps to metrics.<key> per run; snapshot.json counters map to their
     source citations."""
     out = {}
     for path in paths:
         path = Path(path)
         snap = json.loads(path.read_text())
-        if path.name == "metrics.json":
+        if path.name == "analysis.json":
+            out.update(snap.get("doc_metrics", {}))
+        elif path.name == "metrics.json":
             out[path.parent.name] = {f"metrics.{k}": v
                                      for k, v in snap.items()
                                      if not isinstance(v, (dict, list))}
@@ -57,9 +60,10 @@ TEMPLATES = {
 | R (secondary per infected) | {pilot-0.metrics.r_mean} | {pilot-1.metrics.r_mean} | {pilot-2.metrics.r_mean} |
 | Wasted spend (USD) | {pilot-0.metrics.wasted_spend_usd} | {pilot-1.metrics.wasted_spend_usd} | {pilot-2.metrics.wasted_spend_usd} |
 
-Every value regenerates from committed run artifacts with `make reproduce`
-(no network, no API keys). Live-model results are reported only when real
-pilot recordings exist; synthetic artifacts are labeled SYNTHETIC DEV.
+Values are per-run means across seeds (R = cross-seed estimate) from the
+U16 aggregate; they regenerate offline with `make reproduce` (no network,
+no API keys). Recorded sources are synthetic-development; live-model
+results appear only when real live runs exist and are labeled as such.
 """,
     "writeup-metrics.md": """\
 ## Results

@@ -17,6 +17,17 @@ const cy = cytoscape({
     { selector: "node", style: {
       "background-color": CLEAN, label: "data(id)",
       color: "#e8edf2", "font-size": 11, width: 26, height: 26 } },
+    { selector: "node.file", style: {
+      "background-color": "#2a333d", "border-width": 1,
+      "border-color": "#9fb0bf", color: "#9fb0bf", "font-size": 8,
+      shape: "round-rectangle", width: "label", height: 18,
+      "padding-left": "4px", "padding-right": "4px" } },
+    { selector: "node.untrusted", style: {
+      "background-color": "#5a4a22", "border-width": 2,
+      "border-color": "#ffd27a", color: "#ffd27a" } },
+    { selector: "node.killed", style: {
+      "background-color": "#1a1d21", "border-width": 3,
+      "border-color": POISON, color: POISON, opacity: 0.6 } },
     { selector: "node.infected", style: {
       "background-color": POISON, label: "data(id)" } },
     { selector: "node.frozen", style: {
@@ -30,7 +41,33 @@ const cy = cytoscape({
   ],
   layout: { name: "grid", fit: true, padding: 40 },
 });
-function refit() { cy.resize(); cy.layout({ name: "cose", fit: true, padding: 40 }).run(); }
+function refit() {
+  window.__refits = (window.__refits || 0) + 1;
+  cy.resize();
+  const runLayout = () => {
+    try {
+      cy.layout({ name: "cose", fit: true, padding: 40 }).run();
+    } catch (e) {
+      document.title = "LAYOUTERR cose: " + e.message;
+      cy.layout({ name: "grid", fit: true, padding: 40 }).run();
+    }
+  };
+  runLayout();
+  // A layout during a zero/hidden container parks nodes at (0,0); retry
+  // across frames until the box is real.
+  let tries = 0;
+  const retry = () => {
+    tries += 1;
+    const first = cy.nodes()[0];
+    if (first && first.renderedPosition().x === 0
+        && first.renderedPosition().y === 0 && tries < 5) {
+      cy.resize();
+      runLayout();
+      requestAnimationFrame(retry);
+    }
+  };
+  requestAnimationFrame(retry);
+}
 window.addEventListener("resize", refit);
 // The one authored moment: a frozen agent pulses its trace ring.
 function pulse(node) {
@@ -43,23 +80,38 @@ function pulse(node) {
 function normalizeSnapshot(snap) {
   // Engine (U7) shape: {agents, states, graph:{nodes,edges}, counters,...};
   // fixture/dev shape: {agents, edges, counters,...}. Both normalized to
-  // {agents, edges:[{source,target,path}], counters}.
+  // {agents, fileNodes, edges:[{source,target,path}], counters}.
+  // Agent ids lose the agent: prefix; file nodes KEEP file: so agent↔file
+  // edges render directionally (write: agent→file, read: file→agent).
   if (snap.graph) {
-    const nodeId = (n) => String(n.id ?? n).replace(/^agent:/, "");
-    const agentNodes = (snap.graph.nodes || []).map(nodeId)
-      .filter((id) => !String(id).startsWith("file:"));
-    const edges = (snap.graph.edges || []).map((e) => ({
-      source: nodeId(e.source), target: nodeId(e.target),
-      path: e.path ?? "",
-    })).filter((e) => agentNodes.includes(e.source)
-                   && agentNodes.includes(e.target));
+    const nodes = snap.graph.nodes || [];
+    const agentIds = new Set(Object.keys(snap.agents || {}));
+    const nodeEls = nodes.map((n) => {
+      const raw = String(n.id ?? n);
+      const isFile = raw.startsWith("file:");
+      const id = isFile ? raw : raw.replace(/^agent:/, "");
+      return { group: "nodes", data: { id },
+        classes: isFile ? "file" : "", keep: true };
+    });
+    const known = new Set(nodeEls.map((n) => n.data.id));
+    const edges = (snap.graph.edges || []).map((e, i) => ({
+      group: "edges", data: {
+        id: `g${i}`, source: String(e.source).replace(/^agent:/, ""),
+        target: String(e.target).replace(/^agent:/, ""),
+        path: e.path ?? "",
+      },
+    })).filter((e) => known.has(e.data.source) && known.has(e.data.target));
     const agents = snap.agents
-      || Object.fromEntries(agentNodes.map((id) => [id, snap.states?.[id] ?? "clean"]));
-    return { synthetic: !!snap.synthetic, agents, edges,
+      || Object.fromEntries([...agentIds].map((id) => [id, snap.states?.[id] ?? "clean"]));
+    return { synthetic: !!snap.synthetic, agents, nodeEls, edges,
              counters: snap.counters || [],
              controls: snap.controls || [],
              time_since_poisoning_s: snap.time_since_poisoning_s ?? null,
              events: snap.events || [] };
+  }
+  if (!snap.nodeEls && snap.edges) {
+    snap.nodeEls = Object.keys(snap.agents || {}).map((id) => ({
+      group: "nodes", data: { id }, classes: "", keep: true }));
   }
   return snap;
 }
@@ -67,17 +119,46 @@ function normalizeSnapshot(snap) {
 function applySnapshot(snap) {
   snap = normalizeSnapshot(snap);
   document.getElementById("synthetic-badge").classList.toggle("on", !!snap.synthetic);
-  const els = Object.keys(snap.agents).map((id) => ({
-    group: "nodes", data: { id }, classes: snap.agents[id] === "clean" ? "" : snap.agents[id],
-  }));
+  const els = [];
+  for (const n of (snap.nodeEls || [])) {
+    const id = n.data.id;
+    // agent state classes apply to agents only; file/untrusted keep their own
+    const state = snap.agents[id];
+    const cls = n.classes || (state && state !== "clean" ? state : "");
+    els.push({ group: "nodes", data: { id }, classes: cls });
+  }
   for (const [i, e] of (snap.edges || []).entries()) {
+    const d = e.data || e;  // normalized wrappers vs raw edge objects
+    if (!d.source || !d.target) continue;
     els.push({ group: "edges", data: {
-      id: `e${i}`, source: e.source, target: e.target, path: e.path } });
+      id: `e${i}`, source: d.source, target: d.target, path: d.path } });
   }
   cy.elements().remove();
   cy.add(els.length ? els : [{ group: "nodes", data: { id: "—" } }]);
   refit();
   renderCounters(snap.counters);
+}
+
+// Debounced same-engine snapshot refresh: executed actions change the graph,
+// so re-pull /snapshot (serial — never parallel requests) and re-apply while
+// keeping the clock and R24 citations untouched.
+let refreshTimer = null;
+let refreshBusy = false;
+let refreshQueued = false;
+function scheduleGraphRefresh(run) {
+  if (refreshTimer) return;
+  refreshTimer = setTimeout(async () => {
+    refreshTimer = null;
+    if (refreshBusy) { refreshQueued = true; return; }
+    refreshBusy = true;
+    try {
+      const res = await fetch(`/snapshot?run=${encodeURIComponent(run)}`);
+      if (res.ok) applySnapshot(normalizeSnapshot(await res.json()));
+    } finally {
+      refreshBusy = false;
+      if (refreshQueued) { refreshQueued = false; scheduleGraphRefresh(run); }
+    }
+  }, 500);
 }
 
 function renderCounters(rows) {
@@ -172,7 +253,7 @@ function updateR24(ev) {
     `</span>`;
 }
 
-const fmt = (s) => (typeof s === "number" ? s.toFixed(1) : "?") + "s";
+const fmt = (s) => (typeof s === "number" ? s.toFixed(1) + "s" : "unmeasured");
 
 // Shared relative clock: scrub + animation in live and split panels.
 const scrub = document.getElementById("scrub");
@@ -211,7 +292,11 @@ async function runLive(run) {
           document.getElementById("run-name").textContent =
             `${run}${obj.synthetic ? " (synthetic-development)" : ""}`;
           applySnapshot(obj);
-        } else { events.push(obj); tick(obj); }
+        } else {
+          events.push(obj); tick(obj);
+          if (obj.kind === "action_executed")
+            scheduleGraphRefresh(run);  // executed writes/reads change graph
+        }
       } catch { /* skip malformed */ }
     }
   }
@@ -244,3 +329,4 @@ function replayTimeline(events) {
 if (params.get("mode") !== "split") {
   runLive(params.get("run") || "fixture-outbreak");
 }
+
