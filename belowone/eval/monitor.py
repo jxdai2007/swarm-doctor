@@ -299,7 +299,12 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="belowone-monitor")
     sub = parser.add_subparsers(dest="command", required=True)
     p_sample = sub.add_parser("sample", help="write the stratified sample")
-    p_sample.add_argument("--events", required=True)
+    p_sample.add_argument("--events", help="flattened events JSONL")
+    p_sample.add_argument("--runs", nargs="*",
+                          help="U9 recording run dirs (events.jsonl + "
+                               "decisions.jsonl); uses recorded labels only")
+    p_sample.add_argument("--spec-hash", help="trusted spec hash when runs "
+                          "contain decisions from several specs")
     p_sample.add_argument("--per-stratum", type=int, default=50)
     p_sample.add_argument("--seed", type=int, default=0)
     p_sample.add_argument("--out", default="labels/sample.jsonl")
@@ -320,9 +325,19 @@ def main(argv=None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "sample":
-        events = [json.loads(line) for line in
-                  Path(args.events).read_text().splitlines() if line.strip()]
-        sample = sample_events(events, args.per_stratum, args.seed)
+        if args.runs:
+            from belowone.eval.monitor import sample_from_recordings
+            sample = sample_from_recordings(
+                [Path(r) for r in args.runs], args.per_stratum, args.seed,
+                spec_hash=args.spec_hash)
+        else:
+            if not args.events:
+                print("sample needs --events or --runs")
+                return 1
+            events = [json.loads(line) for line in
+                      Path(args.events).read_text().splitlines()
+                      if line.strip()]
+            sample = sample_events(events, args.per_stratum, args.seed)
         out = Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text("".join(json.dumps(e, sort_keys=True) + "\n"

@@ -35,7 +35,15 @@ def epidemic_curve(per_arm: dict[str, list[tuple[float, int]]], *,
     colors = ["#6fb4ff", "#ff5d5d", "#4ecf8d", "#ffd27a", "#c792ea"]
     body = [_line([(0, height - 40), (width - 60, height - 40)], "#2a333d")]
     body.append(_line([(40, 20), (40, height - 40)], "#2a333d"))
-    body.append(_text(width - 60, 24, f"y_max={y_max}", 10, "#9fb0bf", "end"))
+    for frac in (0.25, 0.5, 0.75, 1.0):
+        gy = (height - 40) - frac * (height - 70)
+        gv = y_max * frac
+        body.append(_line([(36, gy), (44, gy)], "#2a333d"))
+        body.append(_text(32, gy + 4, f"{gv:.0f}", 9, "#9fb0bf", "end"))
+    for frac in (0.25, 0.5, 0.75, 1.0):
+        gx = 40 + frac * (width - 110)
+        body.append(_text(gx, height - 26, f"{t_max * frac:.0f}s", 9,
+                          "#9fb0bf", "middle"))
     for i, (arm, series) in enumerate(sorted(per_arm.items())):
         pts = [(40 + (t / t_max) * (width - 110),
                 (height - 40) - (c / y_max) * (height - 70))
@@ -43,9 +51,9 @@ def epidemic_curve(per_arm: dict[str, list[tuple[float, int]]], *,
         color = colors[i % len(colors)]
         body.append(_line(pts, color))
         legend_y = 30 + 14 * i
-        body.append(f'<rect x="{width - 96}" y="{legend_y - 9}" width="10" '
+        body.append(f'<rect x="{width - 200}" y="{legend_y - 9}" width="10" '
                     f'height="3" fill="{color}"/>')
-        body.append(_text(width - 80, legend_y, arm, 10))
+        body.append(_text(width - 184, legend_y, arm[:28], 10))
     return _svg(width, height, "".join(body)), json.dumps(
         {"per_arm": per_arm, "t_max": t_max, "y_max": y_max},
         sort_keys=True, separators=(",", ":"))
@@ -102,7 +110,7 @@ def r_bar(per_arm: dict[str, dict], *, width=640, height=360) -> tuple[str, str]
         body.append(f'<rect x="{cx - bar_w * 0.3:.2f}" y="{mean_y:.2f}" '
                     f'width="{bar_w * 0.6:.2f}" height="{height - 40 - mean_y:.2f}" '
                     f'fill="#6fb4ff" fill-opacity="0.35"/>')
-        body.append(_text(cx, height - 24, arm, 10, "#e8edf2", "middle"))
+        body.append(_text(cx, height - 24, arm[:20], 9, "#e8edf2", "middle"))
         body.append(_text(cx, mean_y - 8, f'{v["mean"]:.2f}', 10, "#6fb4ff",
                           "middle"))
         if not v.get("ci95"):

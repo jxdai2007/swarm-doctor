@@ -36,6 +36,15 @@ def _load(run_dir: Path):
     return events, freezes, snap
 
 
+SHORT = {"no-defense": "no-defense", "prompt-only": "prompt-only",
+         "below-one-verify": "verify"}
+
+
+def short(name: str) -> str:
+    base = name.rsplit("-fixture", 1)[0]
+    return SHORT.get(base, base)
+
+
 def main() -> int:
     committed = ROOT / "experiments" / "committed"
     out = ROOT / "docs" / "generated" / "figures"
@@ -53,16 +62,16 @@ def main() -> int:
             if ev.kind == "infection":
                 count += 1
             series.append((float(ev.payload.get("elapsed", 0)), count))
-        per_arm[run_dir.name] = series
+        per_arm[short(run_dir.name)] = series
         metrics = outbreak_metrics(result, events, seed=0)
-        r_arms[run_dir.name] = {"mean": metrics["r_mean"],
-                                "ci95": metrics["r_ci95"]}
+        r_arms[short(run_dir.name)] = {"mean": metrics["r_mean"],
+                                       "ci95": metrics["r_ci95"]}
         if "verify" in run_dir.name:
             sweep_source = (events, freezes)
 
-    svg, data = figures.epidemic_curve(per_arm)
+    svg, data = figures.epidemic_curve(per_arm, width=1180)
     figures.write_figure(out, "epidemic", svg, data)
-    svg, data = figures.r_bar(r_arms)
+    svg, data = figures.r_bar(r_arms, width=1180)
     figures.write_figure(out, "r-bar", svg, data)
     if sweep_source:
         events, freezes = sweep_source
