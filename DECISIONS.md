@@ -18,3 +18,4 @@
 - Bookkeeping: verified wave ready-1 (U2 c8378dd, U3 a6b7116, U8 7887d6e) with gate hashes; full suite 130 passed (peer WIP excluded); root GATES G1 witnessed; PROGRESS.md written.
 - Config: pinned Jev pricing (input 0.000000042/token, output 0, context 32000) in default config for U4 reserve math; prices sourced from openrouter.ai/typesafe/jev-1.13.
 - U10: waste is numeric USD plus waste_steps (never implied tokens); elapsed is source-relative from run start monotonic=0 preserved on replay; R bootstrap seed = pinned scenario/run seed, 10k resamples, 95% CI. Contract with core-engine 2026-10-03.
+- Branch safety: GitHub default had become feat/below-one (first push created it). Created main at setup commit cc79dca, pushed, set default to main via gh; feature branch retained for incremental work. No force push/reset/rebase.
