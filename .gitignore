@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+!scenarios/outbreak/.env.production
 .venv/
 __pycache__/
 .pytest_cache/
