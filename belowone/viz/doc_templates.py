@@ -39,14 +39,18 @@ def _fmt(value):
 
 
 def _fill(template: str, metrics: dict) -> str:
-    """Replace {run.source} tokens (format_map treats dots as attribute
-    access, so substitution is manual); unknown keys raise (fail loud)."""
+    """Replace {token} tokens (format_map treats dots as attribute access,
+    so substitution is manual); unknown keys raise (fail loud). Tokens are
+    flat aggregate keys ("no-defense.metrics.infected") or nested
+    ("run.source") — both looked up, direct key first."""
     def sub(match):
         key = match.group(1)
+        if key in metrics:
+            return _fmt(metrics[key])
         run, _, source = key.partition(".")
-        if run not in metrics or source not in metrics[run]:
-            raise KeyError(key)
-        return _fmt(metrics[run][source])
+        if run in metrics and source in metrics[run]:
+            return _fmt(metrics[run][source])
+        raise KeyError(key)
     return re.sub(r"\{([a-z0-9-]+\.[a-z0-9_.]+)\}", sub, template)
 
 
