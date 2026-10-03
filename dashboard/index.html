@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Below One — swarm immunity board</title>
+<style>
+  :root {
+    --ground: #101418;
+    --panel: #171d24;
+    --ink: #e8edf2;
+    --ink-dim: #9fb0bf;
+    --hairline: #2a333d;
+    --poison: #ff5d5d;
+    --clean: #4ecf8d;
+    --accent: #6fb4ff;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font: 15px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 16px;
+    padding: 14px 20px; border-bottom: 1px solid var(--hairline);
+  }
+  header h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  header .tag { color: var(--ink-dim); font-size: 13px; }
+  #synthetic-badge {
+    margin-left: auto; font-family: var(--mono); font-size: 11px;
+    color: #ffd27a; border: 1px solid #5a4a22; border-radius: 4px;
+    padding: 2px 8px; display: none;
+  }
+  #synthetic-badge.on { display: inline-block; }
+  main { flex: 1; display: flex; min-height: 0; }
+  #graph-wrap { flex: 1.9; position: relative; min-width: 0; }
+  #graph { position: absolute; inset: 0; }
+  aside {
+    flex: 1; max-width: 380px; border-left: 1px solid var(--hairline);
+    background: var(--panel); display: flex; flex-direction: column; min-width: 0;
+  }
+  aside section { padding: 14px 18px; border-bottom: 1px solid var(--hairline); }
+  aside h2 {
+    font-size: 12px; font-weight: 600; color: var(--ink-dim);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px;
+  }
+  .row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 5px 0; font-variant-numeric: tabular-nums;
+  }
+  .row .v { font-size: 20px; font-weight: 600; }
+  .row .src { font-family: var(--mono); font-size: 10px; color: #5c6b7a; }
+  #ticker { flex: 1; overflow-y: auto; font-family: var(--mono); font-size: 12px; }
+  #ticker div { padding: 3px 18px; color: var(--ink-dim); white-space: nowrap; }
+  #ticker div b { color: var(--ink); font-weight: 500; }
+  #ticker .freeze { color: var(--poison); }
+  #ticker .infection { color: #ffb0b0; }
+  #ticker .release, #ticker .steer { color: var(--clean); }
+  #timeline { height: 44px; border-top: 1px solid var(--hairline);
+    display: flex; align-items: center; gap: 12px; padding: 0 20px; }
+  #clock { font-family: var(--mono); font-size: 13px; color: var(--ink-dim);
+    min-width: 90px; font-variant-numeric: tabular-nums; }
+  #scrub { flex: 1; accent-color: var(--accent); }
+  #split { display: none; flex: 1; min-height: 0; min-width: 0;
+    overflow: hidden; }
+  body[data-mode="split"] #split { display: flex; }
+  body[data-mode="split"] #graph-wrap, body[data-mode="split"] aside { display: none; }
+  .panel { flex: 1; border-right: 1px solid var(--hairline); display: flex;
+    flex-direction: column; min-width: 0; }
+  .panel:last-child { border-right: 0; }
+  .panel h3 { font-size: 13px; font-weight: 600; padding: 10px 14px;
+    border-bottom: 1px solid var(--hairline); }
+  .panel h3 span { color: var(--ink-dim); font-weight: 400; font-size: 11px;
+    font-family: var(--mono); margin-left: 8px; }
+  .panel .graph { flex: 1; position: relative; }
+  .panel .pcount { padding: 6px 14px; border-top: 1px solid var(--hairline);
+    font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-dim); }
+  .panel .pcount b { color: var(--ink); }
+  a.mode { color: var(--accent); font-size: 13px; text-decoration: none; }
+  @media (max-width: 720px) {
+    main { flex-direction: column; }
+    aside { max-width: none; border-left: 0; border-top: 1px solid var(--hairline); }
+    #graph-wrap { min-height: 320px; }
+    #split { flex-direction: column; }
+    .panel { border-right: 0; border-bottom: 1px solid var(--hairline); }
+  }
+</style>
+</head>
+<body data-mode="live">
+<header>
+  <h1>Below One</h1>
+  <span class="tag" id="run-name">loading run…</span>
+  <a class="mode" href="?mode=split" id="mode-link">split view</a>
+  <span id="synthetic-badge">SYNTHETIC DEV — fixture replay, not live evidence</span>
+</header>
+<main>
+  <div id="graph-wrap"><div id="graph"></div></div>
+  <aside>
+    <section><h2>Counters</h2><div id="counters"></div></section>
+    <section style="flex:1;display:flex;flex-direction:column;min-height:0">
+      <h2>Event log</h2><div id="ticker"></div>
+    </section>
+  </aside>
+  <div id="split"></div>
+</main>
+<div id="timeline">
+  <span id="clock">t = 0.0s</span>
+  <input id="scrub" type="range" min="0" max="1000" value="0">
+</div>
+<script src="vendor/cytoscape.min.js"></script>
+<script src="live.js"></script>
+<script src="split.js"></script>
+</body>
+</html>
