@@ -7,13 +7,14 @@ runs exist (R30/R33).
 
 ## Problem
 
-In the 2026 OpenAI / Hugging Face incident, an agent stuck on an impossible
-task found a shared storage cache, posted a cheat, and dozens of agents
-joined within hours; impossible tasks generated most of the poisoning
-attempts (METR investigation, see plan Sources). Agent swarms need the same
-immunity biology gives them: detect, freeze, trace, contain — with containment
-measured as R, the average number of agents each poisoned agent goes on to
-poison.
+Agent swarms need the same immunity biology gives them: detect, freeze,
+trace, contain — with containment measured as R, the average number of agents
+each poisoned agent goes on to poison. The motivating incident and its
+investigation are cited in the plan's Sources section
+([docs/plans/2026-10-03-0413-feat-below-one-plan.md](plans/2026-10-03-0413-feat-below-one-plan.md),
+"Sources / Research": swarmchasing.com logistics; METR investigation of the
+OpenAI/Hugging Face incident) rather than restated here — specifics stay
+attributed to the source, not paraphrased into claims we have not verified.
 
 ## Approach
 
@@ -51,5 +52,7 @@ claims a live gap measurement.
 
 ## Failed hypotheses and negative results
 
-Empty by design until data exists. Failed hypotheses will be reported here,
-not dropped (R38).
+No live hypothesis outcomes have been measured yet; the synthetic checks in
+this repo are development verification, not scientific results. Measured
+outcomes — including failures — will be reported here as real pilot and live
+data land (R38).

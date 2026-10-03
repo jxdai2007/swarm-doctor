@@ -77,15 +77,22 @@ def write_run(runs_dir: Path, arm: str) -> None:
     out = runs_dir / f"{arm}-fixture-outbreak"
     out.mkdir(parents=True, exist_ok=True)
     (out / "snapshot.json").write_text(json.dumps(snap, indent=1))
-    # engine-compatible artifacts: payload.elapsed drives historical SSE
+    # engine-compatible artifacts: full ground-truth payloads (U2 shape),
+    # payload.elapsed drives historical SSE; infections keep provenance
+    original = {ev.seq: ev for ev in events}
     with (out / "events.jsonl").open("w") as f:
         for e in snap["events"]:
+            src = original.get(e["seq"])
+            payload = dict(src.payload) if src else {
+                "elapsed": e["elapsed"]}
+            payload.setdefault("elapsed", e["elapsed"])
+            payload.setdefault("source_agent",
+                               (e.get("payload") or {}).get("source_agent"))
             f.write(json.dumps({
                 "seq": e["seq"], "agent_id": e["agent_id"],
-                "kind": e["kind"], "paths": [],
-                "payload": {"elapsed": e["elapsed"],
-                            "source_agent": (e.get("payload") or {})
-                            .get("source_agent")},
+                "kind": e["kind"],
+                "paths": list(getattr(src, "paths", []) or []),
+                "payload": payload,
             }) + "\n")
 
 
