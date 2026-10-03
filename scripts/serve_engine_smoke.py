@@ -41,18 +41,20 @@ SPEC = {
 
 def main() -> int:
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8899
+    artifact_root = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 \
+        else ROOT / "experiments" / "committed" / "runs"
     root = Path(tempfile.mkdtemp(prefix="u7-engine-smoke-"))
     spec = GoalSpec.from_dict(SPEC, workspace=ROOT)
     detector = Detector(spec, JevClient(None, Meter(),
                                         Cassette(root / "cache", "replay")))
     engine = Engine(spec, EventLog(root / "events.jsonl"), detector,
-                    agent_ids=["a0", "a1", "a2", "a3"], synthetic=True)
+                    agent_ids=["a0", "a1", "a2"], synthetic=True)
     app = create_app(engine, operator_token=secrets.token_urlsafe(32),
-                     artifact_root=ROOT / "experiments" / "display",
+                     artifact_root=artifact_root,
                      dashboard_dir=ROOT / "dashboard")
     import uvicorn
     print(f"engine dashboard on http://127.0.0.1:{port}/?run=live "
-          f"(SYNTHETIC; artifacts root {root})")
+          f"(SYNTHETIC; artifacts root {artifact_root})")
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
     return 0
 
