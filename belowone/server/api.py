@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import math
 from pathlib import Path
 import re
 
@@ -31,6 +32,11 @@ class StartRequest(BaseModel):
     decision_id: str
 
 
+class ReadyRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    agent_id: str
+
+
 class ControlRequest(BaseModel):
     model_config = ConfigDict(extra='forbid')
     agent_id: str
@@ -42,7 +48,7 @@ PUBLIC_ARTIFACTS = {'events.jsonl', 'metrics.json', 'snapshot.json', 'manifest.j
 SAFE_RUN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$')
 
 
-def create_app(engine, *, operator_token, artifact_root=None, dashboard_dir=None, run_id='live'):
+def create_app(engine, *, operator_token, artifact_root=None, dashboard_dir=None, run_id='live', record_action=None):
     if not isinstance(operator_token, str) or len(operator_token) < 24:
         raise ValueError('Operator token must be a private capability of at least 24 characters')
     if not SAFE_RUN.fullmatch(run_id):
@@ -66,6 +72,10 @@ def create_app(engine, *, operator_token, artifact_root=None, dashboard_dir=None
         from fastapi.responses import JSONResponse
         return JSONResponse(status_code=400, content={'detail': str(error)})
 
+    @app.post('/ready')
+    async def ready(body: ReadyRequest):
+        return await engine.ready(body.agent_id)
+
     @app.post('/decide')
     async def decide(body: DecideRequest):
         return await engine.decide(body.agent_id, body.action)
@@ -76,7 +86,7 @@ def create_app(engine, *, operator_token, artifact_root=None, dashboard_dir=None
 
     @app.post('/record')
     async def record(body: RecordRequest):
-        return engine.record(body.agent_id, body.action, body.result,
+        return (record_action or engine.record)(body.agent_id, body.action, body.result,
                              decision_id=body.decision_id, elapsed=body.elapsed).to_dict()
 
     @app.post('/control')
@@ -114,18 +124,27 @@ def create_app(engine, *, operator_token, artifact_root=None, dashboard_dir=None
             raise HTTPException(400, 'Invalid event cursor')
         historical = run is not None and run != run_id
         if historical:
-            history = [json.loads(line) for line in artifact(run, 'events.jsonl').read_bytes().splitlines() if line.strip()]
-            initial = scrub(json.loads(artifact(run, 'snapshot.json').read_bytes()))
+            try:
+                history = [json.loads(line) for line in artifact(run, 'events.jsonl').read_bytes().splitlines() if line.strip()]
+                frames = []
+                for event in history:
+                    seq = event['seq']
+                    elapsed = event['payload']['elapsed']
+                    if type(seq) is not int or seq < 1 or type(elapsed) not in (int, float) or not math.isfinite(elapsed) or elapsed < 0:
+                        raise ValueError('Historical event cursor/time must be finite and nonnegative')
+                    if seq > after:
+                        frames.append(f'id: {seq}\n'.encode() + b'data: ' + artifact_bytes({**event, 'elapsed': elapsed}).rstrip(b'\n') + b'\n\n')
+                initial = scrub(json.loads(artifact(run, 'snapshot.json').read_bytes()))
+            except (KeyError, TypeError, ValueError) as error:
+                raise HTTPException(400, f'Invalid historical event artifact: {error}')
         else:
             history, initial = None, engine.snapshot()
 
         async def stream():
             yield b'data: ' + artifact_bytes(initial).rstrip(b'\n') + b'\n\n'
             if history is not None:
-                for event in history:
-                    if event['seq'] > after:
-                        event['elapsed'] = event['payload']['elapsed']
-                        yield f'id: {event["seq"]}\n'.encode() + b'data: ' + artifact_bytes(event).rstrip(b'\n') + b'\n\n'
+                for frame in frames:
+                    yield frame
                 yield b'data: [done]\n\n'
                 return
             async for event in engine.events(after=after):

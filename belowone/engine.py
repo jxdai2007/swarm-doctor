@@ -102,6 +102,17 @@ class Engine:
             await asyncio.gather(*queued)
             self._trace_tasks = [task for task in self._trace_tasks if task not in queued]
 
+    async def ready(self, agent_id):
+        """Explicit model-query gate, not a snapshot poll."""
+        self.lifecycle.state(agent_id)
+        await self.wait_pending_traces()
+        with self._lock:
+            allowed = self.lifecycle.allowed(agent_id)
+            return self._answer(agent_id, 'ready', 'ready', {
+                'allow': allowed, 'label': 'clean', 'confidence': 1.,
+                'reason': 'Ready' if allowed else f'Agent {self.lifecycle.state(agent_id)}',
+                'signal': 'allow' if allowed else 'deny', 'layer': 'lifecycle'})
+
     async def decide(self, agent_id, action):
         self.lifecycle.state(agent_id)
         normalized = self._action(action)

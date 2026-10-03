@@ -9,6 +9,17 @@ def record(graph, event):
         return
     action = event.payload['action']
     operation = action['operation']
+    if operation == 'unknown':
+        graph.trust.setdefault('agent:' + event.agent_id, 1)
+        for path in event.paths:
+            if not path.startswith('__unknown__/'):
+                raise ValueError('Opaque action must name a reserved unknown resource')
+            graph.trust['file:' + path] = 0  # Untrusted uncertainty, not infection.
+            graph.edges.append({'agent': event.agent_id, 'path': path, 'seq': event.seq,
+                                'elapsed': event.payload['elapsed'], 'source': 'agent:' + event.agent_id,
+                                'target': 'file:' + path, 'operation': 'unknown', 'unknown_access': True,
+                                'reason': 'Opaque shell/tool access; child and off-tool accesses unobserved'})
+        return
     if operation in {'send', 'receive'}:
         if operation == 'receive' and not event.paths:
             return  # Empty inbox is a successful observation, not a contact.

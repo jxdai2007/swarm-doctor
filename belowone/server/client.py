@@ -17,6 +17,9 @@ class EngineClient:
         self._owned = client is None
         self.client = client or httpx.AsyncClient(base_url=base_url, timeout=timeout, trust_env=False)
 
+    async def ready(self, agent_id):
+        return await self._ask('/ready', {'agent_id': agent_id})
+
     async def decide(self, agent_id, action):
         return await self._ask('/decide', {'agent_id': agent_id, 'action': action})
 
