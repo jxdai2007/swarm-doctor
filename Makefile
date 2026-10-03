@@ -19,6 +19,11 @@ LABELS ?=
 MONITOR_CHECKS ?=
 
 reproduce:
+	uv run --frozen python -m belowone.experiments regenerate \
+	  --runs experiments/committed/runs \
+	  --outputs experiments/derived \
+	  $(if $(LABELS),--labels $(LABELS)) \
+	  $(if $(MONITOR_CHECKS),--monitor-checks $(MONITOR_CHECKS))
 	uv run --frozen python -m belowone.experiments reproduce \
 	  --runs experiments/committed/runs \
 	  --outputs experiments/derived \
