@@ -63,12 +63,12 @@ def test_patient_zero_unconditional_and_exposure_not_infection():
 
 def test_freeze_removes_later_events_and_dependent_infections():
     events = outbreak_fixture()
-    # freeze a0 at t=9.5: cheat write (seq 2, t=10) pruned; a1's read (seq 3,
-    # a1 unfrozen, pre-infection) stays, but its infection path [2,3] hits the
-    # pruned write, so both downstream infections die.
+    # freeze a0 at t=9.5: caught before the t=10 cheat — patient zero's
+    # infection is pruned too (prevented, not contained), and every downstream
+    # infection dies with it.
     result = replay_freeze_schedule(events, [("a0", 9.5)])
-    assert [i.seq for i in result.infections] == [4]  # a0's own cheat stays
-    assert {i.seq for i in result.prevented} == {5, 8}
+    assert result.infections == []
+    assert {i.seq for i in result.prevented} == {4, 5, 8}
     kept = {e.seq for e in prune_log(events, [("a0", 9.5)])}
     assert 0 in kept and 1 in kept and 3 in kept and 2 not in kept  # earlier writes preserved
 
@@ -153,8 +153,8 @@ def test_damage_monotone_in_delay():
     events = outbreak_fixture()
     freezes = [("a0", 9.0)]  # early catch: cheat write (t=10) pruned
     sweep = delay_sweep(events, freezes, [0.0, 5.0, DAILY_REVIEW_SECONDS])
-    assert sweep[0]["damage"] == 1 <= sweep[2]["damage"]
-    # big delay: a0 keeps acting past 9 -> a1 and a2 infected before the freeze
+    assert sweep[0]["damage"] == 0 <= sweep[2]["damage"]
+    # big delay: a0 cheats at 10 before the late freeze -> a1 and a2 follow
     assert damage_at(events, freezes, 100.0) == 3 > sweep[0]["damage"]
 
 

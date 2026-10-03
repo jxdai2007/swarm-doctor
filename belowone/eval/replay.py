@@ -77,22 +77,19 @@ def infection_survives(infection, pruned: set) -> bool:
 
 
 def surviving_infections(events, freezes) -> list:
-    """Ground-truth infections that survive the replay's pruning."""
+    """Ground-truth infections that survive the replay's pruning. The KTD6
+    fixpoint in pruned_seqs decides fate (provenance paths for downstream
+    infections, freeze clock for the agent's own); membership is the verdict."""
     pruned = pruned_seqs(events, freezes)
-    out = []
-    for ev in events:
-        if getattr(ev, "kind", None) == "infection" and infection_survives(ev, pruned):
-            out.append(ev)
-    return out
+    return [ev for ev in events
+            if getattr(ev, "kind", None) == "infection" and ev.seq not in pruned]
 
 
 def pruned_infection_only(events, freezes) -> list:
-    """Infections whose every path runs only through pruned events (KTD6)."""
+    """Infections the arm prevented (in the KTD6 fixpoint's pruned set)."""
     pruned = pruned_seqs(events, freezes)
-    return [
-        ev for ev in events
-        if getattr(ev, "kind", None) == "infection" and not infection_survives(ev, pruned)
-    ]
+    return [ev for ev in events
+            if getattr(ev, "kind", None) == "infection" and ev.seq in pruned]
 
 
 @dataclass
