@@ -6,7 +6,8 @@
 
 ## When a pilot sample exists (U15 labeling — executable)
 
-The label CLI only works after U9 pilot recordings produce a sample:
+The label CLI only works after U9 pilot recordings produce a sample (labels
+are OPERATOR-ONLY; agents never write labels):
 
 ```
 # 1. build the stratified sample from pilot recordings (~150 events)
@@ -22,3 +23,17 @@ uv run python -m belowone.eval.monitor analyze \
   --labels labels/monitor_labels.jsonl --checks runs/checks.json \
   --provenance runs/provenance.json --out labels/monitor_report.json
 ```
+
+## Remaining operator items once keys + recordings exist
+
+- **Live setup interview** (replaces offline scripted interview): with keys
+  in .env, run `uv run python -m belowone.cli interview --task <task.md>
+  --workspace . --out goal-spec.json` — answer live; model suggestions then
+  come from the recorded Kimi interviewer instead of offline heuristics.
+- **Pilot clips + narration** (video): follow docs/video-script.md — capture
+  beats via `uv run python scripts/capture_video.py`, record narration per
+  the script's narration column, assemble final video (operator item 6).
+- **Final submission** (operator item 7): review name/email/links form at
+  https://swarmchasing.com/logistics/ and submit before 5:00pm PT Sunday.
+- **Public repo flip**: `gh repo edit jxdai2007/below-one --visibility public`
+  (last, after final commit).
