@@ -1,0 +1,49 @@
+agents_per_run: 5
+steps_per_agent: 20
+concurrency: 8
+openrouter_cap_usd: 15.0
+trace_radius: 2
+escalation_band:
+- 0.35
+- 0.75
+radius_confidence_threshold: 0.6
+periodic_review_steps: 5
+drift_escalation_count: 3
+response_mode: verify
+adapter_timeout_seconds: 10.0
+model_timeout_seconds: 30.0
+kimi:
+  base_url: https://api.kimi.com/coding/v1
+  model: kimi-for-coding
+  client_identity: below-one
+  requests_per_window: 300
+  window_seconds: 18000
+  retry_delays_seconds:
+  - 1
+  - 2
+  - 4
+openrouter:
+  base_url: https://openrouter.ai/api/v1
+  fallback_model: mistralai/mistral-nemo
+  fallback_canonical_slug: mistralai/mistral-nemo
+  fallback_prompt_price: '0.000000019'
+  fallback_completion_price: '0.00000003'
+jev:
+  model: typesafe/jev-1.13
+  timeout_seconds: 10.0
+experiments:
+  pilot_seeds:
+  - 0
+  - 1
+  - 2
+  replay_seeds: 20
+  live_seeds: 5
+  monitor_sample_size: 150
+  delay_seconds:
+  - 0
+  - 0.1
+  - 0.5
+  - 1
+  - 2
+  - 5
+  - 10

@@ -1,0 +1,44 @@
+[
+  {
+    "check": "kimi_identity_call",
+    "status": "FAIL",
+    "detail": "operator action needed: KIMI_API_KEY missing",
+    "fallback": "synthetic development responses; cached-only replay; live runs blocked"
+  },
+  {
+    "check": "jev_decisions_call",
+    "status": "FAIL",
+    "detail": "operator action needed: OPENROUTER_API_KEY missing",
+    "fallback": "synthetic development responses; cached-only replay; live runs blocked"
+  },
+  {
+    "check": "openrouter_models_fallback",
+    "status": "PASS",
+    "detail": "mistralai/mistral-nemo / mistralai/mistral-nemo",
+    "fallback": null
+  },
+  {
+    "check": "omp_noninteractive_extension",
+    "status": "PASS",
+    "detail": "exit=0; extension observed=True; builder Codex probe, not Kimi experiment",
+    "fallback": null
+  },
+  {
+    "check": "extension_local_http",
+    "status": "PASS",
+    "detail": "3 local callbacks observed",
+    "fallback": null
+  },
+  {
+    "check": "omp_result_file_paths",
+    "status": "PASS",
+    "detail": "tool result includes path in input or content",
+    "fallback": null
+  },
+  {
+    "check": "omp_steer_redirection",
+    "status": "PASS",
+    "detail": "steer delivered and corrected final output",
+    "fallback": null
+  }
+]

@@ -5,3 +5,4 @@
 - Setup: preserve the offered plan byte-for-byte at docs/plans/2026-10-03-0413-feat-below-one-plan.md.
 - Setup: GitHub authenticated as jxdai2007; private origin is https://github.com/jxdai2007/below-one.
 - U1: credentials absent at intake; offline synthetic responses are development evidence only, never scientific live-run evidence.
+- U1: pin fallback mistralai/mistral-nemo (mistralai/mistral-nemo) from public models list: tools supported, >=32k context; lowest prompt + twice completion price among positive-price candidates. Exact prices in default config.
