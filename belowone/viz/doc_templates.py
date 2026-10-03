@@ -94,8 +94,6 @@ def _dynamic_section(metrics: dict) -> str:
     averaged across served models; meta lines cited when present."""
     groups = {}
     for key, value in metrics.items():
-        if key in metrics:  # nested group dict handled below
-            continue
         group = key.split(".", 1)[0]
         if group in ALIAS_GROUPS:
             continue
