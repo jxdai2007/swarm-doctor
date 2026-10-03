@@ -1,4 +1,4 @@
-.PHONY: test check-env pilot experiments reproduce rerun check-docs demo demo-offline
+.PHONY: test check-env pilot experiments reproduce regenerate rerun check-docs demo demo-offline
 
 test:
 	uv run --frozen pytest -q
@@ -18,13 +18,17 @@ experiments:
 LABELS ?=
 MONITOR_CHECKS ?=
 
+# Comparison-only when experiments/derived exists; full initialization via
+# `make regenerate` (a pre-reproduce regenerate would mask edited artifacts).
 reproduce:
-	uv run --frozen python -m belowone.experiments regenerate \
+	uv run --frozen python -m belowone.experiments reproduce \
 	  --runs experiments/committed/runs \
 	  --outputs experiments/derived \
 	  $(if $(LABELS),--labels $(LABELS)) \
 	  $(if $(MONITOR_CHECKS),--monitor-checks $(MONITOR_CHECKS))
-	uv run --frozen python -m belowone.experiments reproduce \
+
+regenerate:
+	uv run --frozen python -m belowone.experiments regenerate \
 	  --runs experiments/committed/runs \
 	  --outputs experiments/derived \
 	  $(if $(LABELS),--labels $(LABELS)) \
