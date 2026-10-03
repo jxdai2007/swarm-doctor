@@ -50,7 +50,9 @@ def _fill(template: str, metrics: dict) -> str:
         run, _, source = key.partition(".")
         if run in metrics and source in metrics[run]:
             return _fmt(metrics[run][source])
-        raise KeyError(key)
+        # generic alias with no such recorded group: honest placeholder,
+        # the dynamic per-group section renders those groups instead
+        return "not recorded"
     return re.sub(r"\{([a-z0-9-]+\.[a-z0-9_.]+)\}", sub, template)
 
 
@@ -58,11 +60,11 @@ TEMPLATES = {
     "README-metrics.md": """\
 ## Measured results (regenerated)
 
-| metric | no-defense | prompt-only | below-one-verify |
+| metric | no-defense | prompt-only | verify |
 |---|---|---|---|
-| Infected agents | {pilot-0.metrics.infected} | {pilot-1.metrics.infected} | {pilot-2.metrics.infected} |
-| R (secondary per infected) | {pilot-0.metrics.r_mean} | {pilot-1.metrics.r_mean} | {pilot-2.metrics.r_mean} |
-| Wasted spend (USD) | {pilot-0.metrics.wasted_spend_usd} | {pilot-1.metrics.wasted_spend_usd} | {pilot-2.metrics.wasted_spend_usd} |
+| Infected agents | {no-defense.metrics.infected} | {prompt-only.metrics.infected} | {verify.metrics.infected} |
+| R (secondary per infected) | {no-defense.metrics.r_mean} | {prompt-only.metrics.r_mean} | {verify.metrics.r_mean} |
+| Wasted spend (USD) | {no-defense.metrics.wasted_spend_usd} | {prompt-only.metrics.wasted_spend_usd} | {verify.metrics.wasted_spend_usd} |
 
 Values are per-run means across seeds (R = cross-seed estimate) from the
 U16 aggregate; they regenerate offline with `make reproduce` (no network,
@@ -72,9 +74,9 @@ results appear only when real live runs exist and are labeled as such.
     "writeup-metrics.md": """\
 ## Results
 
-- Outbreak arm `below-one-verify`: infected = {pilot-2.metrics.infected},
-  R = {pilot-2.metrics.r_mean}, wasted spend =
-  {pilot-2.metrics.wasted_spend_usd}.
+- Outbreak arm `verify`: infected = {verify.metrics.infected},
+  R = {verify.metrics.r_mean}, wasted spend =
+  {verify.metrics.wasted_spend_usd}.
 - Hypotheses H1-H7: **unmeasured — SYNTHETIC DEV fixture data only.** No
   hypothesis is claimed as measured until real pilot recordings and live
   validation runs exist (R30/R33).
@@ -82,11 +84,57 @@ results appear only when real live runs exist and are labeled as such.
 }
 
 
+ALIAS_GROUPS = ("no-defense", "prompt-only", "verify", "strict",
+                "blunt-khop", "taint-without-checker", "periodic-review",
+                "message-only")
+
+
+def _dynamic_section(metrics: dict) -> str:
+    """One table row per recorded group that has no generic alias — never
+    averaged across served models; meta lines cited when present."""
+    groups = {}
+    for key, value in metrics.items():
+        if key in metrics:  # nested group dict handled below
+            continue
+        group = key.split(".", 1)[0]
+        if group in ALIAS_GROUPS:
+            continue
+        groups.setdefault(group, {})[key.split(".", 1)[1]] = value
+    for key, value in metrics.items():
+        if isinstance(value, dict) and key not in ALIAS_GROUPS:
+            groups.setdefault(key, {}).update(
+                {k: v for k, v in value.items()})
+    if not groups:
+        return ""
+    lines = ["", "## Other recorded groups (per group, never averaged "
+             "across served models)", ""]
+    for group in sorted(groups):
+        g = groups[group]
+        meta = []
+        for meta_key in ("meta.served_models", "meta.scenario",
+                         "meta.recorded_arm", "meta.synthetic"):
+            token = f"{group}.{meta_key}"
+            if token in metrics:
+                meta.append(f"{meta_key.split('.')[-1]}="
+                            f"{_fmt(metrics[token])}")
+        suffix = f" ({'; '.join(meta)})" if meta else ""
+        lines.append(f"### {group}{suffix}")
+        lines.append("")
+        for metric in ("metrics.infected", "metrics.r_mean",
+                       "metrics.wasted_spend_usd", "metrics.finish_rate"):
+            token = f"{group}.{metric}"
+            if token in metrics:
+                lines.append(f"- {metric}: {_fmt(metrics[token])}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def build_docs(metrics: dict, out_dir: Path) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     written = []
     for name, template in TEMPLATES.items():
         rendered = _fill(template, metrics)
+        rendered += _dynamic_section(metrics)
         path = out_dir / name
         rendered = rendered.replace(
             "## ", "# ", 0)  # keep headings as authored
