@@ -12,12 +12,18 @@ check-env:
 # explicitly with MODE=synthetic (never silent paid action).
 pilot: MODE = live
 pilot:
-	uv run --frozen python -m belowone.experiments pilot --mode $(MODE)
+	uv run --frozen python -m belowone.experiments pilot --mode $(MODE) \
+	  --out /tmp/belowone-pilot/runs \
+	  --workspaces /tmp/belowone-pilot/workspaces \
+	  --commit $$(git rev-parse HEAD)
 
 # Deliberate live authorization: explicit --mode live, keys from .env.
 experiments: MODE = live
 experiments:
-	uv run --frozen python -m belowone.experiments experiments --mode $(MODE)
+	uv run --frozen python -m belowone.experiments experiments --mode $(MODE) \
+	  --out /tmp/belowone-experiments/runs \
+	  --workspaces /tmp/belowone-experiments/workspaces \
+	  --commit $$(git rev-parse HEAD)
 
 # Optional operator inputs for the U15 monitor section:
 #   make reproduce LABELS=labels/monitor_labels.jsonl [MONITOR_CHECKS=experiments/derived/monitor-checks.json]
@@ -42,7 +48,10 @@ regenerate:
 
 rerun: MODE = live
 rerun:
-	uv run --frozen python -m belowone.experiments rerun --mode $(MODE)
+	uv run --frozen python -m belowone.experiments rerun --mode $(MODE) \
+	  --out /tmp/belowone-rerun/runs \
+	  --workspaces /tmp/belowone-rerun/workspaces \
+	  --commit $$(git rev-parse HEAD)
 
 check-docs:
 	uv run --frozen python scripts/check_doc_numbers.py --docs docs/generated
