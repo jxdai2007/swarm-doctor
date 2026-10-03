@@ -29,21 +29,19 @@ def main(argv=None) -> int:
     metric_files = sorted(Path(p) for p in globmod.glob(pattern)) \
         if Path(pattern.split("/*")[0]).is_absolute() \
         else sorted(ROOT.glob(pattern))
-    analysis = ROOT / "experiments/derived/analysis.json"
-    analysis_present = analysis.is_file()
-    if not metric_files and not analysis_present:
-        # aggregate tokens require the U16 analysis; defer the generated-doc
-        # byte check and still run authored-doc checks.
-        print("note: experiments/derived/analysis.json absent (U16 "
-              "aggregate pending); generated-doc byte check deferred, "
-              "authored-doc checks still run")
+    if not metric_files:
+        # aggregate tokens require real metric sources; defer the
+        # generated-doc byte check and still run authored-doc checks.
+        print("note: no metric sources matched --metrics-glob; "
+              "generated-doc byte check deferred, authored-doc checks "
+              "still run")
     metrics = load_metrics(metric_files) if metric_files else {}
     docs = Path(args.docs)
     if not docs.is_absolute():
         docs = ROOT / docs
     regenerated = docs / ".regen"
     failures = []
-    if analysis_present and metric_files:
+    if metric_files:
         generated_applied = True
         written = build_docs(metrics, regenerated)
         for path in written:
