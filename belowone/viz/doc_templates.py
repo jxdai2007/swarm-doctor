@@ -105,7 +105,7 @@ def _dynamic_section(metrics: dict) -> str:
             continue
         groups.setdefault(group, {})[key.split(".", 1)[1]] = value
     for key, value in metrics.items():
-        if isinstance(value, dict) and key.split(".", 1)[0] not in ARMS:
+        if isinstance(value, dict) and key not in ARMS:
             groups.setdefault(key, {}).update(
                 {k: v for k, v in value.items()})
     if not groups:

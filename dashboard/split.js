@@ -104,7 +104,7 @@
       const taskT = ((now - t0) / dur) * maxT;   // task-start clock
       clock.textContent = `t = ${taskT.toFixed(1)}s (task start)`;
       scrub.value = Math.round((taskT / maxT) * 1000);
-      panels.forEach((p) => applyAt(p, p.stream, taskT));
+      panels.forEach((p) => applyAt(p, taskT));
       if (taskT < maxT) requestAnimationFrame(step);
     })(t0);
   }).catch((err) => {
@@ -115,10 +115,7 @@
   function applyAt(p, taskT) {
     const t = p.poisoned_at === null ? taskT : p.poisoned_at + taskT;
     const infected = new Set(), frozen = new Set();
-    const stream = [...p.events, ...p.controls]
-      .filter((c) => c.elapsed !== undefined)
-      .sort((a, b) => (a.elapsed ?? 0) - (b.elapsed ?? 0));
-    for (const ev of stream) {
+    for (const ev of p.stream) {
       if ((ev.elapsed ?? 0) > t) break;
       if (ev.kind === "infection") infected.add(ev.agent_id);
       if (ev.kind === "freeze") frozen.add(ev.agent_id);
