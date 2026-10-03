@@ -150,10 +150,13 @@ def test_recording_adapter_actual_eventlog_roundtrip(tmp_path):
     sample = sample_from_recordings([run], per_stratum=10, seed=0,
                                     spec_hash="specA")
     by_id = {e["event_id"]: e for e in sample}
+    # one row per ACTION keyed to its proposal seq (U9 checks.json key)
     assert by_id["pilot-seed0:1"]["stratum"] == "clean"   # seq starts at 1
-    assert by_id["pilot-seed0:2"]["stratum"] == "violation"  # denied proposal sampled
-    assert by_id["pilot-seed0:3"]["stratum"] == "violation"
+    assert by_id["pilot-seed0:2"]["stratum"] == "violation"  # proposal id
+    assert by_id["pilot-seed0:2"]["kinds"] == ["action_denied",
+                                               "action_proposed"]
     assert by_id["pilot-seed0:4"]["stratum"] == "drift"
+    assert len(sample) == 3  # x2 execution/denial deduped to proposal id
     assert all(e["event_id"].split(":")[1] != "5" for e in sample)
     # specB exists for x1 but the trusted hash filters it out
     assert by_id["pilot-seed0:1"]["stratum"] != "drift"

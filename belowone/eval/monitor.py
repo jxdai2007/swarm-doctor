@@ -77,6 +77,9 @@ def sample_from_recordings(run_dirs: list[Path], per_stratum: int = 50,
         events_file = Path(run_dir) / "events.jsonl"
         if not events_file.is_file():
             continue
+        # one row per ACTION keyed to its proposal seq (U9 checks.json key
+        # "run:proposal_seq"); execution/denial events update, never duplicate
+        action_seq: dict[str, str] = {}
         for line in events_file.read_text().splitlines():
             if not line.strip():
                 continue
@@ -87,19 +90,24 @@ def sample_from_recordings(run_dirs: list[Path], per_stratum: int = 50,
             payload = e.get("payload") or {}
             action_id = str(payload.get("action_id") or e.get("action_id")
                             or e.get("seq"))
+            seq = str(e.get("seq"))
             if action_id in ambiguous:
                 raise ValueError(
-                    f"{run}:{e.get('seq')}: action {action_id} has multiple "
+                    f"{run}:{seq}: action {action_id} has multiple "
                     "recorded labels with different verdicts; pass the "
                     "trusted spec_hash to disambiguate")
             label = decisions.get(action_id)
             if label is None:
                 continue
-            event_id = f"{run}:{e.get('seq')}"
-            rows[event_id] = {
-                "event_id": event_id,
+            if action_id not in action_seq or e.get("kind") == "action_proposed":
+                action_seq[action_id] = seq
+            rows[f"{run}:{action_seq[action_id]}"] = {
+                "event_id": f"{run}:{action_seq[action_id]}",
+                "action_id": action_id,
                 "stratum": label,
-                "kind": e.get("kind"),
+                "kinds": sorted(rows.get(
+                    f"{run}:{action_seq[action_id]}", {}).get("kinds", [])
+                    + [e.get("kind")]),
                 "preview": json.dumps(payload)[:160],
             }
     return sample_events(list(rows.values()), per_stratum, seed)

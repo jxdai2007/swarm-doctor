@@ -3,13 +3,12 @@ from __future__ import annotations
 
 
 def outbreak_card(outbreak: dict) -> dict:
+    # containment is preserved EXACTLY as the metrics report it: None stays
+    # None (unmeasured/prevented/uncontained), never a fabricated zero-shape
     return {
         "infected": outbreak["infected"],
         "r_mean": outbreak["r_mean"],
-        "time_to_contain": {
-            "seconds": (outbreak.get("time_to_contain") or {}).get("seconds"),
-            "steps": (outbreak.get("time_to_contain") or {}).get("steps"),
-        },
+        "time_to_contain": outbreak.get("time_to_contain"),
         "clean_wrongly_frozen": outbreak["clean_wrongly_frozen"],
         "work_completed": outbreak["work_completed"],
         "status": outbreak["status"],
