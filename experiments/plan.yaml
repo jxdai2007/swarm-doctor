@@ -1,0 +1,52 @@
+# Below One experiment priority (U16). Never-cut items first, then the
+# cut-list in reverse cut order (last cut runs first).
+priority:
+  - id: split-screen-race
+    kind: replay
+    arms: [no-defense, prompt-only, below-one-verify]
+    seeds: 20
+  - id: prompt-vs-below-one
+    kind: replay-plus-live
+    arms: [no-defense, prompt-only, below-one-verify]
+    seeds: 20
+    live_runs: 5
+  - id: delay-vs-damage
+    kind: replay
+    arms: [below-one-verify]
+    seeds: 20
+    latency_grid: [measured_jev, 5, 60, 300, daily_review]
+  - id: wasted-spend-card
+    kind: drift-replay
+    arms: [prompt-only, below-one-verify]
+    seeds: 20
+  - id: replay-results
+    kind: aggregate
+    arms: all
+  - id: live-prevention
+    kind: live
+    arms: [below-one-verify]
+    seeds: 5
+    cut_order: 5
+  - id: natural-impossible-task
+    kind: replay
+    arms: [below-one-verify]
+    seeds: 5
+    cut_order: 4
+  - id: scale-hf-size
+    kind: replay
+    arms: [below-one-verify]
+    seeds: 5
+    cut_order: 3
+  - id: interview-ablation
+    kind: replay
+    arms: [interviewed, one-line]
+    seeds: 20
+    cut_order: 2
+  - id: strict-vs-kill
+    kind: replay
+    arms: [below-one-strict, blunt-khop]
+    seeds: 20
+    cut_order: 1
+
+preregistration: experiments/preregistration.md
+pilot_ids: [split-screen-race]   # pilots run without committed preregistration

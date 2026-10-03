@@ -1,0 +1,41 @@
+name: reproduce
+
+on:
+  push:
+    branches: [main, feat/below-one]
+  pull_request:
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    env:
+      # No API keys in CI by design: offline regeneration only (KTD16/R37).
+      KIMI_API_KEY: ""
+      OPENROUTER_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: offline tests
+        run: |
+          make test
+        # make test includes the omp adapter TS suite when adapters/omp exists
+      - name: offline regeneration (metrics, figures, cards, docs)
+        run: |
+          make reproduce
+          make check-docs
+      - name: secret scan over committed artifacts
+        run: |
+          uv run python - <<'PY'
+          import sys; sys.path.insert(0, '.')
+          from pathlib import Path
+          from belowone.experiments import scan_secrets
+          import subprocess
+          tracked = subprocess.run(
+              ["git", "ls-files"], capture_output=True, text=True
+          ).stdout.split()
+          hits = scan_secrets([Path(p) for p in tracked
+                               if Path(p).is_file()])
+          for hit in hits:
+              print("SECRET:", hit)
+          sys.exit(1 if hits else 0)
+          PY

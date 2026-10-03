@@ -1,0 +1,150 @@
+{
+ "synthetic": true,
+ "agents": {
+  "a0": "infected",
+  "a1": "infected",
+  "a2": "infected",
+  "a3": "clean"
+ },
+ "edges": [
+  {
+   "source": "a0",
+   "target": "a1",
+   "path": "shared.py",
+   "seq": 3,
+   "operation": "write->read"
+  },
+  {
+   "source": "a1",
+   "target": "a2",
+   "path": "spread.py",
+   "seq": 7,
+   "operation": "write->read"
+  }
+ ],
+ "counters": [
+  {
+   "label": "Infected agents",
+   "value": 3,
+   "source": "metrics.infected"
+  },
+  {
+   "label": "R (secondary infections per infected)",
+   "value": 0.6666666666666666,
+   "source": "metrics.r_mean"
+  },
+  {
+   "label": "Wasted spend (USD)",
+   "value": 0.0,
+   "source": "metrics.wasted_spend_usd"
+  },
+  {
+   "label": "False steers",
+   "value": 0,
+   "source": "metrics.false_steers"
+  }
+ ],
+ "controls": [],
+ "time_since_poisoning_s": 10.0,
+ "events": [
+  {
+   "seq": 0,
+   "agent_id": "a0",
+   "kind": "action_executed",
+   "elapsed": 5.0,
+   "payload": {
+    "source_agent": null
+   }
+  },
+  {
+   "seq": 1,
+   "agent_id": "a0",
+   "kind": "action_executed",
+   "elapsed": 8.0,
+   "payload": {
+    "source_agent": null
+   }
+  },
+  {
+   "seq": 2,
+   "agent_id": "a0",
+   "kind": "action_executed",
+   "elapsed": 10.0,
+   "payload": {
+    "source_agent": null
+   }
+  },
+  {
+   "seq": 4,
+   "agent_id": "a0",
+   "kind": "infection",
+   "elapsed": 10.0,
+   "payload": {
+    "source_agent": null
+   }
+  },
+  {
+   "seq": 3,
+   "agent_id": "a1",
+   "kind": "action_executed",
+   "elapsed": 20.0,
+   "payload": {
+    "source_agent": null
+   }
+  },
+  {
+   "seq": 5,
+   "agent_id": "a1",
+   "kind": "infection",
+   "elapsed": 25.0,
+   "payload": {
+    "source_agent": "a0"
+   }
+  },
+  {
+   "seq": 6,
+   "agent_id": "a1",
+   "kind": "action_executed",
+   "elapsed": 30.0,
+   "payload": {
+    "source_agent": null
+   }
+  },
+  {
+   "seq": 7,
+   "agent_id": "a2",
+   "kind": "action_executed",
+   "elapsed": 35.0,
+   "payload": {
+    "source_agent": null
+   }
+  },
+  {
+   "seq": 8,
+   "agent_id": "a2",
+   "kind": "infection",
+   "elapsed": 40.0,
+   "payload": {
+    "source_agent": "a1"
+   }
+  },
+  {
+   "seq": 9,
+   "agent_id": "a3",
+   "kind": "action_executed",
+   "elapsed": 50.0,
+   "payload": {
+    "source_agent": null
+   }
+  },
+  {
+   "seq": 10,
+   "agent_id": "a3",
+   "kind": "outcome",
+   "elapsed": 60.0,
+   "payload": {
+    "source_agent": null
+   }
+  }
+ ]
+}

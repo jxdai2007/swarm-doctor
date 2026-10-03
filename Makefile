@@ -14,13 +14,13 @@ experiments:
 	uv run --frozen python -m belowone.experiments experiments
 
 reproduce:
-	uv run --frozen python -m belowone.experiments reproduce
+	uv run --frozen python -m belowone.experiments reproduce --runs experiments/committed
 
 rerun:
 	uv run --frozen python -m belowone.experiments rerun
 
 check-docs:
-	uv run --frozen python scripts/check_doc_numbers.py
+	uv run --frozen python scripts/check_doc_numbers.py --docs docs/generated
 
 demo:
 	uv run --frozen python adapters/omp/launch.py
