@@ -2,10 +2,10 @@
 
 Scope: implement every unit in the approved plan and preserve operator-only authority.
 
-- [x] G1: scaffold checks report real dependency outcomes and offline tests pass
+- [ ] G1: scaffold checks report real dependency outcomes and offline tests pass
   CHECK: make test && make check-env
   EXPECT: FIRST_HOUR_REPORT_WRITTEN
-  EVIDENCE: witnessed 2026-10-03; docs/first-hour-checks.md committed fb721e1 (public catalog PASS, four real omp Codex probes PASS, Kimi/Jev fallbacks recorded missing-key); full offline suite re-confirmed 130 passed (ops full-suite run, peer WIP excluded). Endpoint probes not re-run — no behavior change since fb721e1.
+  EVIDENCE: pending (runner-executed automatic-evidence required; witnessed-only facts live in PROGRESS.md, not gate evidence)
 
 - [ ] G2: every implementation unit scenario and integrated engine path passes
   CHECK: make test
