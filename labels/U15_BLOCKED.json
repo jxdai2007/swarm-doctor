@@ -1,1 +1,20 @@
-{"unit": "U15", "status": "blocked-operator", "reason": "human labels required (R31); sample committed at labels/sample.jsonl; label with: uv run python -m belowone.eval.monitor label --sample labels/sample.jsonl --labels labels/monitor_labels.jsonl", "labeled": 0, "report": "labels/monitor_report.json will be written only after labels exist"}
+{
+ "unit": "U15",
+ "status": "blocked-operator",
+ "reason": "human labels required (R31); sample committed at labels/sample.jsonl; label with: uv run python -m belowone.eval.monitor label --sample labels/sample.jsonl --labels labels/monitor_labels.jsonl",
+ "labeled": 0,
+ "report": "labels/monitor_report.json will be written only after labels exist",
+ "sample": {
+  "total": 64,
+  "strata": {
+   "clean": 50,
+   "drift": 1,
+   "violation": 13
+  },
+  "recordings": [
+   "pilot-0/1/2 (no-defense outbreak seeds 0-2)",
+   "drift-demo-1791043563 (verify arm, real steer+freeze)",
+   "hero-verify (verify arm outbreak, prevented)"
+  ]
+ }
+}
