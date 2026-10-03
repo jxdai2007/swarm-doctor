@@ -218,7 +218,8 @@ def capture_one(name, url, seconds, kind, out, base):
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
         try:
-            assert_board(base, url)
+            if kind in ("board", "board-events"):
+                assert_board(base, url)
             context = browser.new_context(
                 viewport={"width": 1440, "height": 900},
                 record_video_dir=str(out / "_raw"),

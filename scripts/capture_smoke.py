@@ -16,7 +16,14 @@ try:
                 f"{BASE}/?run=does-not-exist", 1, "board", out, BASE)
     raise SystemExit("FAIL: bad-run capture should have raised")
 except Exception as e:
-    print("failure path OK:", str(e)[:60], "- browser closed in finally")
+    import subprocess
+    def chromium_count():
+        return len(subprocess.run(
+            ["pgrep", "-f", "chromium"], capture_output=True,
+            text=True).stdout.split())
+    print("failure path OK:", type(e).__name__, "- browser closed in "
+          "finally; observed chromium processes after close:",
+          chromium_count())
 
 # 2. success path: real archived recording captured to a real webm
 capture_one("static-smoke-SYNTHETIC-DEV",

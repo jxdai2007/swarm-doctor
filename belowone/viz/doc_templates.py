@@ -92,7 +92,7 @@ results appear only when real live runs exist and are labeled as such.
 }
 
 
-from belowone.eval.arms import ARMS as ALIAS_GROUPS
+from belowone.eval.arms import ARMS
 
 
 def _dynamic_section(metrics: dict) -> str:
@@ -101,11 +101,11 @@ def _dynamic_section(metrics: dict) -> str:
     groups = {}
     for key, value in metrics.items():
         group = key.split(".", 1)[0]
-        if group in ALIAS_GROUPS:
+        if group in ARMS:
             continue
         groups.setdefault(group, {})[key.split(".", 1)[1]] = value
     for key, value in metrics.items():
-        if isinstance(value, dict) and key not in ALIAS_GROUPS:
+        if isinstance(value, dict) and key.split(".", 1)[0] not in ARMS:
             groups.setdefault(key, {}).update(
                 {k: v for k, v in value.items()})
     if not groups:

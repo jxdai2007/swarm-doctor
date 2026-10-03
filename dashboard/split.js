@@ -74,9 +74,10 @@
                                           c.value]));
       p.events = snap.events || [];
       p.controls = snap.controls || [];
-      // applyAt stream: events before controls at equal elapsed, stable order
+      // render stream: full retained timeline (events + controls, elapsed
+      // present), events before controls at equal elapsed, stable order
       p.stream = [...p.events, ...p.controls]
-        .filter((e) => ["infection", "freeze", "release"].includes(e.kind))
+        .filter((e) => e.elapsed !== undefined)
         .sort((a, b) => (a.elapsed ?? 0) - (b.elapsed ?? 0));
       p.poisoned_at = Math.min(...p.events
         .filter((e) => e.kind === "infection")
