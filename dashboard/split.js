@@ -8,6 +8,8 @@
   const runs = ["no-defense", "prompt-only", "below-one-verify"];
   const params = new URLSearchParams(location.search);
   const seed = params.get("seed") || "fixture-outbreak";
+  const POISON = "#ff5d5d", CLEAN = "#4ecf8d", DIM = "#39434e",
+    FROZEN = "#ffd27a";
   const panels = runs.map((name) => {
     const p = document.createElement("div");
     p.className = "panel";
@@ -24,11 +26,14 @@
           { selector: "node", style: {
             "background-color": CLEAN, label: "data(id)",
             color: "#e8edf2", "font-size": 9, width: 18, height: 18 } },
-          { selector: "node.infected", style: { "background-color": POISON } },
+          { selector: "node.infected", style: {
+            "background-color": POISON } },
           { selector: "node.frozen", style: {
-            "background-color": POISON, "border-width": 2,
-            "border-color": POISON } },
-          { selector: "edge", style: { width: 1, "line-color": DIM } },
+            "background-color": "#3a3325", "border-width": 2,
+            "border-color": FROZEN, color: FROZEN } },
+          { selector: "edge", style: {
+            width: 1, "line-color": DIM, "curve-style": "bezier",
+            "target-arrow-shape": "triangle", "arrow-color": DIM } },
         ],
         layout: { name: "grid", fit: true, padding: 20 },
       }),

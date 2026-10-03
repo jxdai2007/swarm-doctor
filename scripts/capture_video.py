@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base", default="http://127.0.0.1:8765")
+    parser.add_argument("--base", default="http://127.0.0.1:8899")
     parser.add_argument("--out", default="clips")
     parser.add_argument("--seconds", type=float, default=14.0)
     args = parser.parse_args()
