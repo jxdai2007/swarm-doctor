@@ -44,7 +44,7 @@
         ],
         layout: { name: "grid", fit: true, padding: 20 },
       }),
-      events: [], controls: [], poisoned_at: null, r: undefined,
+      events: [], controls: [], poisoned_at: null,
     };
   });
 
@@ -72,18 +72,16 @@
       p.counters = Object.fromEntries(
         (snap.counters || []).map((c) => [c.source.split(".").pop(),
                                           c.value]));
-      // precomputed immutable merged stream: events before controls at
-      // equal elapsed, stable order
-      p.stream = [...(snap.events || []), ...(snap.controls || [])]
+      p.events = snap.events || [];
+      p.controls = snap.controls || [];
+      // applyAt stream: events before controls at equal elapsed, stable order
+      p.stream = [...p.events, ...p.controls]
         .filter((e) => ["infection", "freeze", "release"].includes(e.kind))
         .sort((a, b) => (a.elapsed ?? 0) - (b.elapsed ?? 0));
-      p.events = p.stream;
-      p.controls = p.stream;
       p.poisoned_at = Math.min(...p.events
         .filter((e) => e.kind === "infection")
         .map((e) => e.elapsed ?? 0), Infinity);
       if (!isFinite(p.poisoned_at)) p.poisoned_at = null;
-      p.provenance = snap.provenance || {};
     });
     const maxT = Math.max(1, ...panels.flatMap((p) =>
       p.events.map((e) => e.elapsed || 0)));
@@ -105,7 +103,7 @@
       const taskT = ((now - t0) / dur) * maxT;   // task-start clock
       clock.textContent = `t = ${taskT.toFixed(1)}s (task start)`;
       scrub.value = Math.round((taskT / maxT) * 1000);
-      panels.forEach((p) => applyAt(p, taskT));
+      panels.forEach((p) => applyAt(p, p.stream, taskT));
       if (taskT < maxT) requestAnimationFrame(step);
     })(t0);
   }).catch((err) => {

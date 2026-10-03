@@ -217,45 +217,45 @@ def capture_one(name, url, seconds, kind, out, base):
     from playwright.sync_api import sync_playwright
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
-    if kind in ("board", "board-events"):
-        assert_board(base, url)
-    context = browser.new_context(
-        viewport={"width": 1440, "height": 900},
-        record_video_dir=str(out / "_raw"),
-        record_video_size={"width": 1440, "height": 900})
-    page = context.new_page()
-    page.goto(url, wait_until="domcontentloaded")
-    if kind == "board":
-        # board label must be loaded, not 'loading run…'
-        page.wait_for_function(
-            "!document.getElementById('run-name').textContent"
-            ".startsWith('loading')", timeout=10000)
-    if kind == "board-events":
-        # event counter must be non-empty before recording
-        page.wait_for_function(
-            "document.getElementById('ticker').children.length > 0",
-            timeout=15000)
-    if kind == "badge":
-        page.wait_for_function(
-            "document.getElementById('synthetic-badge')"
-            ".classList.contains('on')", timeout=15000)
-    if kind == "steer":
-        # everyday beat: an ACTUAL recorded steer event must appear
-        page.wait_for_function(
-            "document.getElementById('ticker').textContent"
-            ".includes('steer')", timeout=20000)
-    try:
-        page.wait_for_timeout(int(seconds * 1000))
-    finally:
-        context.close()  # flushes the video before the file move
-        browser.close()
-    saved = sorted((out / "_raw").glob("*.webm"),
-                   key=lambda p: p.stat().st_mtime)[-1]
-    target = out / f"{name}.webm"
-    shutil.move(str(saved), target)
-    print(f"captured {target.name} ({target.stat().st_size} bytes, "
-          f"{seconds}s)")
-    browser.close()
+        try:
+            assert_board(base, url)
+            context = browser.new_context(
+                viewport={"width": 1440, "height": 900},
+                record_video_dir=str(out / "_raw"),
+                record_video_size={"width": 1440, "height": 900})
+            page = context.new_page()
+            page.goto(url, wait_until="domcontentloaded")
+            if kind == "board":
+                # board label must be loaded, not 'loading run…'
+                page.wait_for_function(
+                    "!document.getElementById('run-name').textContent"
+                    ".startsWith('loading')", timeout=10000)
+            if kind == "board-events":
+                # event counter must be non-empty before recording
+                page.wait_for_function(
+                    "document.getElementById('ticker').children.length > 0",
+                    timeout=15000)
+            if kind == "badge":
+                page.wait_for_function(
+                    "document.getElementById('synthetic-badge')"
+                    ".classList.contains('on')", timeout=15000)
+            if kind == "steer":
+                # everyday beat: an ACTUAL recorded steer event must appear
+                page.wait_for_function(
+                    "document.getElementById('ticker').textContent"
+                    ".includes('steer')", timeout=20000)
+            try:
+                page.wait_for_timeout(int(seconds * 1000))
+            finally:
+                context.close()  # flushes the video before the file move
+            saved = sorted((out / "_raw").glob("*.webm"),
+                           key=lambda p: p.stat().st_mtime)[-1]
+            target = out / f"{name}.webm"
+            shutil.move(str(saved), target)
+            print(f"captured {target.name} ({target.stat().st_size} bytes, "
+                  f"{seconds}s)")
+        finally:
+            browser.close()
 
 
 if __name__ == "__main__":
