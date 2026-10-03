@@ -17,7 +17,7 @@ target: ~120s.
 | 6 | Delay vs damage | 10s | charts-SYNTHETIC-DEV.webm | epidemic, R bars, delay-damage SVGs | "These figures regenerate offline from committed artifacts. What they will show about real delay is unmeasured until pilot runs — the sweep machinery is already exercised here." |
 | 7 | Receipts | 10s | receipt-SYNTHETIC-DEV.webm | rendered outbreak receipt | "Every outbreak gets a receipt: patient zero, catching layer, containment, cost — each value bound to a metric key, or it says unmeasured." |
 | 8 | Reproduce proof | 15s | reproduce-proof-SYNTHETIC-DEV.webm | actual `make reproduce` output | "And this is the honesty check: regenerate every number from the committed artifacts, offline, no keys — byte-identical or the build fails." |
-| 9 | Everyday dial | 20s | everyday-SYNTHETIC-DEV.webm | live board, wasted-spend and false-steer counters | "Everyday use is the other dial: drift gets steered, wasted spend and false steers are counted per run — for the people who just want their agent to stay on task." |
+| 9 | Everyday dial | 20s | everyday-drift-SYNTHETIC-DEV.webm | live board: real Jev steer on a0's off-scope refactor (seq 2, "does not advance the locked goal"), then a0 finishes — grader 22/22 | "Everyday use is the other dial: the checker steers an agent back from an off-scope refactor — and it still finishes the task, graded 22 of 22. Wasted spend and false steers are counted per run." |
 | 10 | Honest limits | 5s | threat-SYNTHETIC-DEV.webm | threat-model blind-spot rows | "And the honest part: shells and off-tool channels are still blind spots. The threat model says so on the repo." |
 | 11 | Close | 5s | repo-close-SYNTHETIC-DEV.webm | repo README | "Below One. Keep your swarm's R below one." |
 
