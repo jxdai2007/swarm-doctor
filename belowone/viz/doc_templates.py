@@ -92,9 +92,7 @@ results appear only when real live runs exist and are labeled as such.
 }
 
 
-ALIAS_GROUPS = ("no-defense", "prompt-only", "verify", "strict",
-                "blunt-khop", "taint-without-checker", "periodic-review",
-                "message-only")
+from belowone.eval.arms import ARMS as ALIAS_GROUPS
 
 
 def _dynamic_section(metrics: dict) -> str:
@@ -139,11 +137,8 @@ def build_docs(metrics: dict, out_dir: Path) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     written = []
     for name, template in TEMPLATES.items():
-        rendered = _fill(template, metrics)
-        rendered += _dynamic_section(metrics)
+        rendered = _fill(template, metrics) + _dynamic_section(metrics)
         path = out_dir / name
-        rendered = rendered.replace(
-            "## ", "# ", 0)  # keep headings as authored
         path.write_text(rendered)
         written.append(path)
     return written

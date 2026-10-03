@@ -55,21 +55,16 @@ def sample_from_recordings(run_dirs: list[Path], per_stratum: int = 50,
     Events without a recorded label for the selected spec are excluded (no
     guessed strata)."""
     rows: dict[str, dict] = {}
-    if spec_hash is None:
-        hashes = set()
-        for run_dir in run_dirs:
+    for run_dir in run_dirs:
+        run_hash = spec_hash
+        if run_hash is None:
             config = Path(run_dir) / "config.json"
             if config.is_file():
-                cfg = json.loads(config.read_text())
-                if cfg.get("spec_hash"):
-                    hashes.add(cfg["spec_hash"])
-        if len(hashes) == 1:
-            spec_hash = hashes.pop()
-        elif len(hashes) > 1:
-            raise ValueError(
-                f"runs contain {len(hashes)} different spec hashes "
-                f"{sorted(hashes)}; pass the trusted --spec-hash")
-    for run_dir in run_dirs:
+                run_hash = json.loads(config.read_text()).get("spec_hash")
+            if not run_hash:
+                raise ValueError(
+                    f"{run_dir}: no spec_hash in config.json and no "
+                    "--spec-hash given; refusing to guess")
         run = Path(run_dir).name
         decisions: dict[str, str] = {}
         ambiguous: set[str] = set()
@@ -81,7 +76,7 @@ def sample_from_recordings(run_dirs: list[Path], per_stratum: int = 50,
                 d = json.loads(line)
                 if d.get("label") not in STRATA:
                     continue
-                if spec_hash is not None and d.get("spec_hash") != spec_hash:
+                if run_hash is not None and d.get("spec_hash") != run_hash:
                     continue
                 action_id = str(d.get("action_id")
                                 or d.get("payload", {}).get("action_id")
@@ -150,8 +145,13 @@ class LabelStore:
                                     sort_keys=True) + "\n")
 
     def rows(self) -> dict[str, str]:
-        return {json.loads(line)["event_id"]: json.loads(line)["label"]
-                for line in self.path.read_text().splitlines() if line.strip()}
+        out: dict[str, str] = {}
+        for line in self.path.read_text().splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)  # single parse; last write wins
+            out[row["event_id"]] = row["label"]
+        return out
 
 
 def next_unlabeled(sample: list[dict], store: LabelStore) -> dict | None:

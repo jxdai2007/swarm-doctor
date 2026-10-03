@@ -72,9 +72,13 @@
       p.counters = Object.fromEntries(
         (snap.counters || []).map((c) => [c.source.split(".").pop(),
                                           c.value]));
-      p.events = (snap.events || [])
-        .filter((e) => ["infection", "freeze", "release"].includes(e.kind));
-      p.controls = snap.controls || [];
+      // precomputed immutable merged stream: events before controls at
+      // equal elapsed, stable order
+      p.stream = [...(snap.events || []), ...(snap.controls || [])]
+        .filter((e) => ["infection", "freeze", "release"].includes(e.kind))
+        .sort((a, b) => (a.elapsed ?? 0) - (b.elapsed ?? 0));
+      p.events = p.stream;
+      p.controls = p.stream;
       p.poisoned_at = Math.min(...p.events
         .filter((e) => e.kind === "infection")
         .map((e) => e.elapsed ?? 0), Infinity);

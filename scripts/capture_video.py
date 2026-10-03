@@ -198,24 +198,25 @@ def main() -> int:
 
     import urllib.request
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch()
-        for name, url, seconds, kind in beats:
-            try:
-                capture_one(pw, name, url, seconds, kind, out, args.base)
-            except Exception as error:
-                print(f"SKIPPED: {name}: {error}")
-                continue
-        browser.close()
+    for name, url, seconds, kind in beats:
+        try:
+            capture_one(name, url, seconds, kind, out, args.base)
+        except Exception as error:
+            print(f"SKIPPED: {name}: {error}")
+            continue
     for note in skipped:
         print("SKIPPED:", note)
     shutil.rmtree(out / "_raw", ignore_errors=True)
     return 0
 
 
-def capture_one(pw, name, url, seconds, kind, out, base):
-    """One browser per beat so an abort never loses the remaining beats."""
-    browser = pw.chromium.launch()
+def capture_one(name, url, seconds, kind, out, base):
+    """One browser per beat so an abort never loses the remaining beats.
+    context.close() flushes the video before the file move; browser.close()
+    always runs in finally."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
     if kind in ("board", "board-events"):
         assert_board(base, url)
     context = browser.new_context(
@@ -243,8 +244,11 @@ def capture_one(pw, name, url, seconds, kind, out, base):
         page.wait_for_function(
             "document.getElementById('ticker').textContent"
             ".includes('steer')", timeout=20000)
-    page.wait_for_timeout(int(seconds * 1000))
-    context.close()
+    try:
+        page.wait_for_timeout(int(seconds * 1000))
+    finally:
+        context.close()  # flushes the video before the file move
+        browser.close()
     saved = sorted((out / "_raw").glob("*.webm"),
                    key=lambda p: p.stat().st_mtime)[-1]
     target = out / f"{name}.webm"

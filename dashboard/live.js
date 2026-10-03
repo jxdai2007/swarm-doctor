@@ -153,7 +153,7 @@ function scheduleGraphRefresh(run) {
     refreshBusy = true;
     try {
       const res = await fetch(`/snapshot?run=${encodeURIComponent(run)}`);
-      if (res.ok) applySnapshot(normalizeSnapshot(await res.json()));
+      if (res.ok) applySnapshot(await res.json());
     } finally {
       refreshBusy = false;
       if (refreshQueued) { refreshQueued = false; scheduleGraphRefresh(run); }
