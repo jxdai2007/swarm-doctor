@@ -121,31 +121,48 @@ def test_analyze_judge_comparison_when_both_measured():
     assert report["judge"]["accuracy"] == 1.0
 
 
-def test_recording_adapter_stratifies_by_recorded_labels(tmp_path):
+def test_recording_adapter_actual_eventlog_roundtrip(tmp_path):
+    from belowone.runlog import EventLog
     run = tmp_path / "pilot-seed0"
     run.mkdir()
-    events = [
-        {"seq": 0, "kind": "action_executed", "agent_id": "a0",
-         "action_id": "x1", "payload": {"elapsed": 1.0}},
-        {"seq": 1, "kind": "action_executed", "agent_id": "a1",
-         "action_id": "x2", "payload": {"elapsed": 2.0}},
-        {"seq": 2, "kind": "action_executed", "agent_id": "a2",
-         "payload": {"elapsed": 3.0}},  # no recorded decision: excluded
-        {"seq": 3, "kind": "outcome", "agent_id": "a0",
-         "payload": {"elapsed": 4.0}},
-    ]
-    (run / "events.jsonl").write_text(
-        "".join(json.dumps(e) + "\n" for e in events))
+    log = EventLog(run / "events.jsonl")
+    # real U2 append roundtrip: action_id lives in payload; a violation trip
+    # DENIES its proposal, so executed-only sampling would bias clean
+    log.append("a0", "action_executed", paths=["src/tool.py"],
+               payload={"elapsed": 1.0, "action_id": "x1"})
+    log.append("a1", "action_proposed", paths=[".env.production"],
+               payload={"elapsed": 2.0, "action_id": "x2"})
+    log.append("a1", "action_denied", paths=[".env.production"],
+               payload={"elapsed": 2.5, "action_id": "x2"})
+    log.append("a2", "action_executed", paths=["docs/notes.md"],
+               payload={"elapsed": 3.0, "action_id": "x3"})
+    log.append("a2", "action_executed", paths=["ok.py"],
+               payload={"elapsed": 4.0})  # no action_id/decision: excluded
     (run / "decisions.jsonl").write_text(
-        json.dumps({"action_id": "x1", "label": "drift"}) + "\n"
-        + json.dumps({"action_id": "x2", "label": "violation"}) + "\n")
-    sample = sample_from_recordings([run], per_stratum=10, seed=0)
+        json.dumps({"spec_hash": "specA", "action_id": "x1",
+                    "label": "clean"}) + "\n"
+        + json.dumps({"spec_hash": "specA", "action_id": "x2",
+                      "label": "violation"}) + "\n"
+        + json.dumps({"spec_hash": "specB", "action_id": "x1",
+                      "label": "drift"}) + "\n"
+        + json.dumps({"spec_hash": "specA", "action_id": "x3",
+                      "label": "drift"}) + "\n")
+    sample = sample_from_recordings([run], per_stratum=10, seed=0,
+                                    spec_hash="specA")
     by_id = {e["event_id"]: e for e in sample}
-    assert by_id["pilot-seed0:0"]["stratum"] == "drift"
-    assert by_id["pilot-seed0:1"]["stratum"] == "violation"
-    assert len(sample) == 2  # unlabeled event never invented a stratum
+    assert by_id["pilot-seed0:1"]["stratum"] == "clean"   # seq starts at 1
+    assert by_id["pilot-seed0:2"]["stratum"] == "violation"  # denied proposal sampled
+    assert by_id["pilot-seed0:3"]["stratum"] == "violation"
+    assert by_id["pilot-seed0:4"]["stratum"] == "drift"
+    assert all(e["event_id"].split(":")[1] != "5" for e in sample)
+    # specB exists for x1 but the trusted hash filters it out
+    assert by_id["pilot-seed0:1"]["stratum"] != "drift"
+    # two specs disagree on x1: no trusted hash -> loud, no silent last-wins
+    with pytest.raises(ValueError, match="spec_hash"):
+        sample_from_recordings([run], per_stratum=10, seed=0)
     # deterministic
-    again = sample_from_recordings([run], per_stratum=10, seed=0)
+    again = sample_from_recordings([run], per_stratum=10, seed=0,
+                                   spec_hash="specA")
     assert [e["event_id"] for e in sample] == [e["event_id"] for e in again]
 
 

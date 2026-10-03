@@ -38,24 +38,42 @@ def sample_events(events: list[dict], per_stratum: int, seed: int) -> list[dict]
 
 
 def sample_from_recordings(run_dirs: list[Path], per_stratum: int = 50,
-                           seed: int = 0) -> list[dict]:
-    """U9-recording adapter: read each run's events.jsonl (U2 EventLog) plus
-    decisions.jsonl and stratify by the RECORDED detector label. Stable event
-    id = "<run>:<seq>". Events without a recorded decision label are excluded
-    (no guessed strata). Target ~150 total via per_stratum."""
+                           seed: int = 0, *,
+                           spec_hash: str | None = None) -> list[dict]:
+    """U9-recording adapter: read each run's events.jsonl (U2 EventLog JSONL)
+    plus decisions.jsonl and stratify by the RECORDED detector label.
+
+    Schema notes: U2 events carry action_id inside payload; proposals and
+    denials are sampled alongside executed actions (violation trips usually
+    DENY the action — executed-only sampling would bias the sample clean).
+
+    Trust: when several decisions exist for one action (e.g. interviewed vs
+    one-line spec), the caller MUST pass the trusted spec_hash; ambiguity
+    without one raises rather than silently taking the last record.
+
+    Stable event id = "<run>:<seq>". Events without a recorded label for the
+    selected spec are excluded (no guessed strata)."""
     rows: dict[str, dict] = {}
     for run_dir in run_dirs:
         run = Path(run_dir).name
         decisions: dict[str, str] = {}
+        ambiguous: set[str] = set()
         dec_file = Path(run_dir) / "decisions.jsonl"
         if dec_file.is_file():
             for line in dec_file.read_text().splitlines():
                 if not line.strip():
                     continue
                 d = json.loads(line)
-                if d.get("label") in STRATA:
-                    decisions[str(d.get("action_id") or d.get("action_seq"))] = \
-                        d["label"]
+                if d.get("label") not in STRATA:
+                    continue
+                if spec_hash is not None and d.get("spec_hash") != spec_hash:
+                    continue
+                action_id = str(d.get("action_id")
+                                or d.get("payload", {}).get("action_id")
+                                or d.get("action_seq"))
+                if action_id in decisions and decisions[action_id] != d["label"]:
+                    ambiguous.add(action_id)
+                decisions.setdefault(action_id, d["label"])
         events_file = Path(run_dir) / "events.jsonl"
         if not events_file.is_file():
             continue
@@ -63,16 +81,26 @@ def sample_from_recordings(run_dirs: list[Path], per_stratum: int = 50,
             if not line.strip():
                 continue
             e = json.loads(line)
-            if e.get("kind") != "action_executed":
+            if e.get("kind") not in ("action_executed", "action_proposed",
+                                     "action_denied"):
                 continue
-            label = decisions.get(str(e.get("action_id") or e.get("seq")))
+            payload = e.get("payload") or {}
+            action_id = str(payload.get("action_id") or e.get("action_id")
+                            or e.get("seq"))
+            if action_id in ambiguous:
+                raise ValueError(
+                    f"{run}:{e.get('seq')}: action {action_id} has multiple "
+                    "recorded labels with different verdicts; pass the "
+                    "trusted spec_hash to disambiguate")
+            label = decisions.get(action_id)
             if label is None:
                 continue
             event_id = f"{run}:{e.get('seq')}"
             rows[event_id] = {
                 "event_id": event_id,
                 "stratum": label,
-                "preview": json.dumps(e.get("payload", {}))[:160],
+                "kind": e.get("kind"),
+                "preview": json.dumps(payload)[:160],
             }
     return sample_events(list(rows.values()), per_stratum, seed)
 
@@ -135,7 +163,11 @@ def analyze(labels: dict[str, str], checks: dict, *,
     """
     prov = dict(provenance or {})
     prov.setdefault("source", "fixture")
-    synthetic = prov.get("source") != "recording"
+    # A recording is not automatically live science: U9 recordings made with
+    # synthetic/dev models stay synthetic. Only trusted run metadata may set
+    # live=True, and this module never promotes it on its own.
+    prov.setdefault("live", False)
+    synthetic = not (prov.get("source") == "recording" and prov.get("live"))
 
     def as_checker_map(raw: dict) -> dict[str, dict]:
         out = {}
