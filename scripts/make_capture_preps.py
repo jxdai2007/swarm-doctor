@@ -42,9 +42,9 @@ def _latest(prefix: str) -> Path | None:
 
 
 def drift_demo(commit: str) -> Path:
-    existing = _latest("drift-demo")
-    if existing:
-        return existing
+    if (RUNS / "drift-demo" / "manifest.json").is_file():
+        print("drift-demo already sealed; skipping")
+        return RUNS / "drift-demo"
     from belowone.harness.launcher import CSV_IMPLEMENTATION, synthetic_clients, run
     from belowone.meter import Meter
     from belowone.runstore import RunStore
@@ -63,13 +63,11 @@ def drift_demo(commit: str) -> Path:
     ]}
     clients = synthetic_clients(cache, meter, spread=False, scripts=scripts)
     workspace = Path(tempfile.mkdtemp(prefix="u13-drift-ws-"))
-    import time as _t
-    asyncio.run(run(store, f"drift-demo-{int(_t.time())}", seed=0, arm="verify",
+    asyncio.run(run(store, "drift-demo", seed=0, arm="verify",
                     scenario="drift", clients=clients,
                     workspace_root=str(workspace), commit=commit,
                     agent_count=3, steps=20))
-    import glob as _g
-    folder = Path(sorted(_g.glob(str(RUNS / "drift-demo-*")))[-1])
+    folder = RUNS / "drift-demo"
     kinds = [json.loads(line)["kind"]
              for line in (folder / "events.jsonl").read_text().splitlines()
              if line.strip()]
@@ -142,7 +140,7 @@ def split_derived(commit: str) -> list[Path]:
             "derived_by": "scripts/make_capture_preps.py (canonical "
                           "harness.arms.replay_arm)",
         }
-        out = RUNS.parent / f"derived-{arm}"
+        out = DISPLAY / f"derived-{arm}"
         out.mkdir(parents=True, exist_ok=True)
         (out / "snapshot.json").write_text(json.dumps(snap, indent=1))
         with (out / "events.jsonl").open("w") as f:
@@ -165,7 +163,7 @@ def main() -> int:
     drift_demo(commit)
     hero_verify(commit)
     split_derived(commit)
-    print(f"artifact root for the engine: {RUNS.parent} "
+    print(f"engine display artifact root: {DISPLAY} "
           "(run=pilot-0, drift-demo, derived-no-defense, ...)")
     return 0
 

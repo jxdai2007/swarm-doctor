@@ -71,9 +71,14 @@ def write_run(runs_dir: Path, arm: str) -> None:
     for i, (a, t) in enumerate(freezes):
         events.append(ev(200 + i, a, "freeze", t))
     result = replay_freeze_schedule(events, freezes)
+    # tuple freezes -> full sourced control records (dashboard contract)
+    controls = [{"agent_id": a, "kind": "freeze", "elapsed": t,
+                 "order": i} for i, (a, t) in enumerate(freezes)]
+    result.controls = controls
     outbreak = outbreak_metrics(result, events, seed=0)
     drift = drift_metrics(events, freezes, total_agents=4)
-    snap = snapshot(result.events, freezes, outbreak, drift, synthetic=True)
+    snap = snapshot(result.events, result.controls, outbreak, drift,
+                    synthetic=True)
     out = runs_dir / f"{arm}-fixture-outbreak"
     out.mkdir(parents=True, exist_ok=True)
     (out / "snapshot.json").write_text(json.dumps(snap, indent=1))

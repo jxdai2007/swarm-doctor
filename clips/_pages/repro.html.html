@@ -1,10 +1,15 @@
 <!doctype html><meta charset='utf-8'><title>terminal</title><style>body{background:#101418;color:#e8edf2;font:16px/1.5 monospace;padding:40px}pre{white-space:pre-wrap}.badge{color:#ffd27a;border:1px solid #5a4a22;border-radius:4px;padding:2px 8px}</style><span class='badge'>SYNTHETIC DEV — development recording, not live evidence</span><h1>terminal</h1><pre>$ make reproduce  [narrow counter check until full U16 pipeline]
 uv run --frozen python -m belowone.experiments reproduce --runs experiments/committed/runs
-SKIP (not recomputable from events): drift-demo/defense_cost_usd: meter classification lives in the harness run (not in events)
-SKIP (not recomputable from events): drift-demo-1791040815/defense_cost_usd: meter classification lives in the harness run (not in events)
-SKIP (not recomputable from events): drift-demo-1791040860/defense_cost_usd: meter classification lives in the harness run (not in events)
-SKIP (not recomputable from events): drift-demo-2/defense_cost_usd: meter classification lives in the harness run (not in events)
-SKIP (not recomputable from events): pilot-0/defense_cost_usd: meter classification lives in the harness run (not in events)
-SKIP (not recomputable from events): pilot-1/defense_cost_usd: meter classification lives in the harness run (not in events)
-SKIP (not recomputable from events): pilot-2/defense_cost_usd: meter classification lives in the harness run (not in events)
-REPRODUCE_IDENTICAL</pre>
+Traceback (most recent call last):
+  File &quot;&lt;frozen runpy&gt;&quot;, line 198, in _run_module_as_main
+  File &quot;&lt;frozen runpy&gt;&quot;, line 88, in _run_code
+  File &quot;/Users/jollenshoulddai/Desktop/below-one/belowone/experiments.py&quot;, line 633, in &lt;module&gt;
+    raise SystemExit(main())
+                     ^^^^^^
+  File &quot;/Users/jollenshoulddai/Desktop/below-one/belowone/experiments.py&quot;, line 610, in main
+    diffs = reproduce(args.runs, args.outputs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &quot;/Users/jollenshoulddai/Desktop/below-one/belowone/experiments.py&quot;, line 393, in reproduce
+    raise ValueError(f&#x27;Derived output tree missing or empty: {outputs}&#x27;)
+ValueError: Derived output tree missing or empty: /Users/jollenshoulddai/Desktop/below-one/experiments/derived
+make: *** [reproduce] Error 1</pre>

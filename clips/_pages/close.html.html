@@ -25,7 +25,8 @@ uv run python -m belowone.cli interview \
   --task path/to/task.md --workspace . --out goal-spec.json
 
 # 2. launch the swarm under the engine (oh-my-pi adapter)
-make demo                                  # requires adapter + model keys
+make demo   # live 3-agent swarm; needs .env with KIMI/OPENROUTER keys
+make demo-offline   # SYNTHETIC DEV board without keys
 
 # 3. watch the live board
 uv run python scripts/serve_engine_smoke.py 8899   # dev harness; adapter
