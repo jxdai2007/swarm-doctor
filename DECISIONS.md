@@ -13,3 +13,7 @@
 - U3: lock smoke exposed macOS /var alias mismatch; canonicalize parent aliases while rejecting final symlinks. Permanent alias regression passes with session-hash pin.
 - U8: JSON-subset YAML manifest pins authored material; isolated grader ignores PASS and verifies protected tests. Exempt only the explicitly fake scenario .env.production from environment gitignore.
 - Foundation verification: all 130 tests passed; held-out reference plus locked-spec smoke passed; sealed-run verification rejected a config byte change. Workers ran no checks; host independently verified.
+
+## 2026-10-03 (ops)
+- Bookkeeping: verified wave ready-1 (U2 c8378dd, U3 a6b7116, U8 7887d6e) with gate hashes; full suite 130 passed (peer WIP excluded); root GATES G1 witnessed; PROGRESS.md written.
+- Config: pinned Jev pricing (input 0.000000042/token, output 0, context 32000) in default config for U4 reserve math; prices sourced from openrouter.ai/typesafe/jev-1.13.
