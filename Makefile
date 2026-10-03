@@ -13,8 +13,17 @@ pilot:
 experiments:
 	uv run --frozen python -m belowone.experiments experiments
 
+# Optional operator inputs for the U15 monitor section:
+#   make reproduce LABELS=labels/monitor_labels.jsonl [MONITOR_CHECKS=experiments/derived/monitor-checks.json]
+LABELS ?=
+MONITOR_CHECKS ?=
+
 reproduce:
-	uv run --frozen python -m belowone.experiments reproduce --runs experiments/committed/runs
+	uv run --frozen python -m belowone.experiments reproduce \
+	  --runs experiments/committed/runs \
+	  --outputs experiments/derived \
+	  $(if $(LABELS),--labels $(LABELS)) \
+	  $(if $(MONITOR_CHECKS),--monitor-checks $(MONITOR_CHECKS))
 
 rerun:
 	uv run --frozen python -m belowone.experiments rerun

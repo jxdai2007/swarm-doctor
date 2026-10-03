@@ -18,7 +18,12 @@ uv run python -m belowone.eval.monitor sample --runs runs \
 uv run python -m belowone.eval.monitor label \
   --sample labels/sample.jsonl --labels labels/monitor_labels.jsonl
 
-# 3. analysis (after labeling)
+# 3. full regeneration incl. the U15 monitor section (after labeling):
+#    feeds the same labels file so the regenerated report is byte-compared
+make reproduce LABELS=labels/monitor_labels.jsonl \
+  MONITOR_CHECKS=experiments/derived/monitor-checks.json
+
+# 3b. monitor analysis alone (after labeling):
 uv run python -m belowone.eval.monitor analyze \
   --labels labels/monitor_labels.jsonl --checks runs/checks.json \
   --provenance runs/provenance.json --out labels/monitor_report.json
