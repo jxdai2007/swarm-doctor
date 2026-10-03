@@ -150,8 +150,11 @@ function updateR24(ev) {
   const el = document.getElementById("r24");
   if (!el) return;
   const n_infected = r24.infected.size;
-  const n_children = new Set(Object.values(r24.children).flatMap(s => [...s])).size;
-  const live_r = n_infected ? n_children / n_infected : null;
+  // mean secondary infections PER INFECTED AGENT (KTD4): only children of
+  // infected agents count; a clean forwarder is not an infected source.
+  const live_children = [...r24.infected]
+    .reduce((sum, a) => sum + (r24.children[a]?.size ?? 0), 0);
+  const live_r = n_infected ? live_children / n_infected : null;
   el.innerHTML =
     `<span>since poisoning <b>${fmt(r24.poisoned_at)}</b></span>` +
     ` <span>infected <b>${n_infected}</b></span>` +

@@ -77,9 +77,16 @@ def write_run(runs_dir: Path, arm: str) -> None:
     out = runs_dir / f"{arm}-fixture-outbreak"
     out.mkdir(parents=True, exist_ok=True)
     (out / "snapshot.json").write_text(json.dumps(snap, indent=1))
+    # engine-compatible artifacts: payload.elapsed drives historical SSE
     with (out / "events.jsonl").open("w") as f:
         for e in snap["events"]:
-            f.write(json.dumps(e) + "\n")
+            f.write(json.dumps({
+                "seq": e["seq"], "agent_id": e["agent_id"],
+                "kind": e["kind"], "paths": [],
+                "payload": {"elapsed": e["elapsed"],
+                            "source_agent": (e.get("payload") or {})
+                            .get("source_agent")},
+            }) + "\n")
 
 
 def main():
