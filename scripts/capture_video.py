@@ -86,7 +86,7 @@ def build_pages(base: str) -> dict[str, str]:
     from belowone.eval.replay import replay_freeze_schedule
     from belowone.viz.receipts import receipt, render
     from types import SimpleNamespace
-    run = ROOT / "experiments/committed/below-one-verify-fixture-outbreak"
+    run = ROOT / "experiments/committed/runs/pilot-0"
     events = []
     for line in (run / "events.jsonl").read_text().splitlines():
         e = json.loads(line)

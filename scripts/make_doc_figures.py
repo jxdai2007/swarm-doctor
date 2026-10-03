@@ -46,7 +46,7 @@ def short(name: str) -> str:
 
 
 def main() -> int:
-    committed = ROOT / "experiments" / "committed"
+    committed = ROOT / "experiments" / "committed" / "runs"
     out = ROOT / "docs" / "generated" / "figures"
     out.mkdir(parents=True, exist_ok=True)
 

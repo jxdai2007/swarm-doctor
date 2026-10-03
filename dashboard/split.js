@@ -54,7 +54,9 @@
 
   Promise.all(runs.map(load)).then((snaps) => {
     document.getElementById("run-name").textContent =
-      `three-arm split race (seed ${seed}, fixture)`;
+      `three-arm split race (seed ${seed}, synthetic-development)`;
+    // split owns the badge: never let a shared snapshot overwrite it off
+    document.getElementById("synthetic-badge").classList.add("on");
     snaps.forEach((snap, i) => {
       const p = panels[i];
       const agents = snap.agents || {};

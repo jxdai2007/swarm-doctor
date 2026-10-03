@@ -128,14 +128,20 @@ function tick(ev) {
 // R24 live counters, computed ONLY from retained events/controls; citations
 // name the contributing seq range, never a new metric file.
 const r24 = { infected: new Set(), frozen: new Set(), released: new Set(),
-  children: {}, poisoned_at: null, first_seq: null, last_seq: null };
+  children: {}, poisoned_at: null, first_seq: null, last_seq: null,
+  control_seqs: [] };
 
 function updateR24(ev) {
   if (r24.poisoned_at === null && ev.kind === "infection")
     r24.poisoned_at = ev.elapsed;
   if (ev.seq !== null && ev.seq !== undefined) {
-    if (r24.first_seq === null) r24.first_seq = ev.seq;
-    r24.last_seq = ev.seq;
+    if (["freeze", "release", "steer", "trace", "kill", "end"]
+        .includes(ev.kind)) {
+      if (!r24.control_seqs.includes(ev.seq)) r24.control_seqs.push(ev.seq);
+    } else {
+      if (r24.first_seq === null) r24.first_seq = ev.seq;
+      r24.last_seq = ev.seq;
+    }
   }
   if (ev.kind === "infection") {
     r24.infected.add(ev.agent_id);
@@ -161,7 +167,9 @@ function updateR24(ev) {
     ` <span>frozen <b>${r24.frozen.size}</b></span>` +
     ` <span>released <b>${r24.released.size}</b></span>` +
     ` <span>live R <b>${live_r === null ? "unmeasured" : live_r.toFixed(2)}</b></span>` +
-    ` <span class="src">events seq:${r24.first_seq ?? "—"}..${r24.last_seq ?? "—"}</span>`;
+    ` <span class="src">events seq:${r24.first_seq ?? "—"}..${r24.last_seq ?? "—"}` +
+    (r24.control_seqs.length ? ` · controls seq:${r24.control_seqs.join(",")}` : "") +
+    `</span>`;
 }
 
 const fmt = (s) => (typeof s === "number" ? s.toFixed(1) : "?") + "s";
@@ -201,7 +209,7 @@ async function runLive(run) {
         const obj = JSON.parse(data);
         if (obj.synthetic !== undefined || obj.counters) {
           document.getElementById("run-name").textContent =
-            `${run}${obj.synthetic ? " (fixture)" : ""}`;
+            `${run}${obj.synthetic ? " (synthetic-development)" : ""}`;
           applySnapshot(obj);
         } else { events.push(obj); tick(obj); }
       } catch { /* skip malformed */ }
