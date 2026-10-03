@@ -19,7 +19,15 @@ def load_metrics(paths: list[Path]) -> dict:
         path = Path(path)
         snap = json.loads(path.read_text())
         if path.name == "analysis.json":
-            out.update(snap.get("doc_metrics", {}))
+            doc_metrics = snap.get("doc_metrics", {})
+            # flatten nested groups to the flat token shape _dynamic_section
+            # emits, so checker and regenerate agree byte-for-byte
+            for token, value in doc_metrics.items():
+                if isinstance(value, dict):
+                    for sub_key, sub_value in value.items():
+                        out[f"{token}.{sub_key}"] = sub_value
+                else:
+                    out[token] = value
         elif path.name == "metrics.json":
             out[path.parent.name] = {f"metrics.{k}": v
                                      for k, v in snap.items()
