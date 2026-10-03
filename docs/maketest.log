@@ -1,0 +1,184 @@
+uv run --frozen pytest -q
+/Users/jollenshoulddai/Desktop/below-one/.venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:217: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+........................................................................ [ 22%]
+......................................................F..F.............. [ 44%]
+........................................................................ [ 66%]
+........................................................................ [ 88%]
+.......................................                                  [100%]
+=================================== FAILURES ===================================
+_______ test_three_actual_omp_processes_share_real_engine_and_dashboard ________
+
+tmp_path = PosixPath('/private/var/folders/xw/hy89dbw916n__btxykc7xpym0000gn/T/pytest-of-jollenshoulddai/pytest-2058/test_three_actual_omp_processe0')
+
+    async def test_three_actual_omp_processes_share_real_engine_and_dashboard(tmp_path):
+        if not shutil.which('omp'):
+            pytest.skip('Actual omp runtime not installed')
+        path = ROOT / 'adapters/omp/launch.py'
+        spec = importlib.util.spec_from_file_location('belowone_omp_launch', path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        result = await module.launch(out=tmp_path / 'runs', workspaces=tmp_path / 'work',
+                                     commit='synthetic-runtime-check', synthetic=True, agents=3,
+                                     timeout=90)
+>       assert result['synthetic'] and result['completed']
+E       assert (True and False)
+
+tests/test_omp_launch.py:41: AssertionError
+__ test_actual_omp_operator_kill_aborts_inflight_shell_without_another_query ___
+
+fut = <Task cancelled name='Task-842' coro=<Server.serve() done, defined at /Users/jollenshoulddai/Desktop/below-one/.venv/lib/python3.12/site-packages/uvicorn/server.py:68>>
+timeout = 5
+
+    async def wait_for(fut, timeout):
+        """Wait for the single Future or coroutine to complete, with timeout.
+    
+        Coroutine will be wrapped in Task.
+    
+        Returns result of the Future or coroutine.  When a timeout occurs,
+        it cancels the task and raises TimeoutError.  To avoid the task
+        cancellation, wrap it in shield().
+    
+        If the wait is cancelled, the task is also cancelled.
+    
+        If the task supresses the cancellation and returns a value instead,
+        that value is returned.
+    
+        This function is a coroutine.
+        """
+        # The special case for timeout <= 0 is for the following case:
+        #
+        # async def test_waitfor():
+        #     func_started = False
+        #
+        #     async def func():
+        #         nonlocal func_started
+        #         func_started = True
+        #
+        #     try:
+        #         await asyncio.wait_for(func(), 0)
+        #     except asyncio.TimeoutError:
+        #         assert not func_started
+        #     else:
+        #         assert False
+        #
+        # asyncio.run(test_waitfor())
+    
+    
+        if timeout is not None and timeout <= 0:
+            fut = ensure_future(fut)
+    
+            if fut.done():
+                return fut.result()
+    
+            await _cancel_and_wait(fut)
+            try:
+                return fut.result()
+            except exceptions.CancelledError as exc:
+                raise TimeoutError from exc
+    
+        async with timeouts.timeout(timeout):
+>           return await fut
+
+/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/tasks.py:510: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.venv/lib/python3.12/site-packages/uvicorn/server.py:70: in serve
+    await self._serve(sockets)
+.venv/lib/python3.12/site-packages/uvicorn/server.py:89: in _serve
+    await self.shutdown(sockets=sockets)
+.venv/lib/python3.12/site-packages/uvicorn/server.py:278: in shutdown
+    await asyncio.wait_for(
+/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/tasks.py:510: in wait_for
+    return await fut
+.venv/lib/python3.12/site-packages/uvicorn/server.py:307: in _wait_tasks_to_complete
+    await asyncio.sleep(0.1)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+delay = 0.1, result = None
+
+    async def sleep(delay, result=None):
+        """Coroutine that completes after a given time (in seconds)."""
+        if delay <= 0:
+            await __sleep0()
+            return result
+    
+        loop = events.get_running_loop()
+        future = loop.create_future()
+        h = loop.call_later(delay,
+                            futures._set_result_unless_cancelled,
+                            future, result)
+        try:
+>           return await future
+E           asyncio.exceptions.CancelledError
+
+/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/tasks.py:655: CancelledError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/private/var/folders/xw/hy89dbw916n__btxykc7xpym0000gn/T/pytest-of-jollenshoulddai/pytest-2058/test_actual_omp_operator_kill_0')
+
+    async def test_actual_omp_operator_kill_aborts_inflight_shell_without_another_query(tmp_path):
+        path = ROOT / 'adapters/omp/launch.py'
+        spec = importlib.util.spec_from_file_location('belowone_omp_kill', path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        killer = None
+        async def ready(engine):
+            nonlocal killer
+            async def kill_after_native_start():
+                marker = engine.spec._workspace / 'started.txt'
+                while not marker.exists():
+                    await asyncio.sleep(.01)
+                await engine.control('a0', 'kill', 'Synthetic actual-native-shell abort check')
+            killer = asyncio.create_task(kill_after_native_start())
+        scripts = {'a0': [('bash', {'command': 'printf started > started.txt; sleep 30'})],
+                   'a1': [('write', {'path': 'reports/export.py', 'content': module.CSV_IMPLEMENTATION}),
+                          ('below_one_finish', {})]}
+>       result = await asyncio.wait_for(module.launch(
+            out=tmp_path / 'runs', workspaces=tmp_path / 'work', commit='synthetic-runtime-check',
+            synthetic=True, agents=3, scripts=scripts, engine_ready=ready, timeout=90), 45)
+
+tests/test_omp_launch.py:116: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/tasks.py:510: in wait_for
+    return await fut
+adapters/omp/launch.py:247: in launch
+    await asyncio.wait_for(server_task, 5)
+/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/tasks.py:509: in wait_for
+    async with timeouts.timeout(timeout):
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Timeout [expired]>
+exc_type = <class 'asyncio.exceptions.CancelledError'>
+exc_val = CancelledError(), exc_tb = <traceback object at 0x109556e00>
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Optional[bool]:
+        assert self._state in (_State.ENTERED, _State.EXPIRING)
+    
+        if self._timeout_handler is not None:
+            self._timeout_handler.cancel()
+            self._timeout_handler = None
+    
+        if self._state is _State.EXPIRING:
+            self._state = _State.EXPIRED
+    
+            if self._task.uncancel() <= self._cancelling and exc_type is exceptions.CancelledError:
+                # Since there are no new cancel requests, we're
+                # handling this.
+>               raise TimeoutError from exc_val
+E               TimeoutError
+
+/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/timeouts.py:111: TimeoutError
+=========================== short test summary info ============================
+FAILED tests/test_omp_launch.py::test_three_actual_omp_processes_share_real_engine_and_dashboard - assert (True and False)
+FAILED tests/test_omp_launch.py::test_actual_omp_operator_kill_aborts_inflight_shell_without_another_query - TimeoutError
+2 failed, 325 passed in 953.83s (0:15:53)
+make: *** [test] Error 1
+EXIT=2
