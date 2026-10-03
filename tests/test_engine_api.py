@@ -446,3 +446,39 @@ async def test_real_tool_completed_before_control_is_truthfully_recorded_after(t
     assert (tmp_path / 'task.py').read_text() == 'completed real tool'
     assert engine.snapshot()['states']['a0'] == 'killed'
     assert engine.snapshot()['graph']['edges'][0]['elapsed'] == 2
+
+
+async def test_historical_sse_preflights_before_headers_and_finishes_normally(tmp_path):
+    engine = make_engine(tmp_path / 'current')
+    history = tmp_path / 'runs' / 'recorded'
+    history.mkdir(parents=True)
+    journal = EventLog(history / 'events.jsonl')
+    journal.append('a0', 'action_proposed', payload={'elapsed': 1})
+    journal.append('a0', 'outcome', payload={'elapsed': 2, 'completed': False})
+    (history / 'snapshot.json').write_text(json.dumps(engine.snapshot()))
+    async with serving(engine, artifact_root=history.parent) as client:
+        response = await client.get('/events?run=recorded')
+        assert response.status_code == 200
+        assert response.text.endswith('data: [done]\n\n')
+        assert response.text.count('id: ') == 2
+        resumed = await client.get('/events?run=recorded', headers={'Last-Event-ID': '1'})
+        assert 'id: 1\n' not in resumed.text and 'id: 2\n' in resumed.text
+        assert resumed.text.endswith('data: [done]\n\n')
+        # A late bad event must not reset an already-started HTTP 200 stream.
+        journal.append('a0', 'outcome', payload={'completed': False})
+        invalid = await client.get('/events?run=recorded')
+        assert invalid.status_code == 400
+        assert 'Invalid historical event artifact' in invalid.json()['detail']
+
+
+async def test_off_actions_never_create_checker_trust_live_or_journal_rebuild(tmp_path):
+    engine = make_engine(tmp_path)
+    await engine.control('a0', 'off')
+    proposal = action('write', 'unchecked.py')
+    answer = await engine.decide('a0', proposal)
+    engine.start('a0', answer['decision_id'])
+    engine.record('a0', proposal, {'ok': True}, decision_id=answer['decision_id'])
+    assert engine.graph.last_clean['a0'] == 0
+    rebuilt = make_engine(tmp_path)
+    assert rebuilt.graph.last_clean['a0'] == 0
+    assert rebuilt.graph.writes['unchecked.py']

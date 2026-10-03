@@ -10,6 +10,8 @@ def record(graph, event):
     action = event.payload['action']
     operation = action['operation']
     if operation in {'send', 'receive'}:
+        if operation == 'receive' and not event.paths:
+            return  # Empty inbox is a successful observation, not a contact.
         if not event.paths:
             raise ValueError('Executed message must name delivered message versions')
         event = SimpleNamespace(kind=event.kind, agent_id=event.agent_id, seq=event.seq,

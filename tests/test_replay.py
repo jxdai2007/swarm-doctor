@@ -10,6 +10,8 @@ from belowone.eval.graph import rebuild
 from belowone.eval.replay import attribute, prune_log, replay_freeze_schedule, replay_no_defense
 from belowone.eval.delay import DAILY_REVIEW_SECONDS, delay_sweep
 from belowone.eval.ablation import ablate
+from belowone.eval.replay import provenance_paths
+from belowone.runlog import EventLog
 
 
 def event(seq, agent, kind, elapsed, paths=(), **payload):
@@ -227,3 +229,65 @@ def test_zero_radius_disables_trace_and_clean_periodic_checks_never_freeze():
     assert [(control['kind'], control['agent_id']) for control in result.controls] == [('freeze', 'a0')]
     decisions['a1'] = decision('a1', 'a0', at=1)
     assert replay_arm(events, decisions, spec_hash='spec', arm='periodic-review').controls == []
+
+
+def test_real_journal_result_dependencies_prune_forward_before_policy_graph(tmp_path):
+    log = EventLog(tmp_path / 'events.jsonl')
+
+    def executed(agent, operation, path, at, **result):
+        seq = len(log.read()) + 1
+        return log.append(agent, 'action_executed', paths=[path], payload={
+            'elapsed': at, 'action_id': f'a{seq}', 'manifest_drift': False,
+            'action': {'tool': operation, 'operation': operation, 'paths': [path], 'input': {}},
+            'result': {'ok': True, **result}})
+
+    source = executed('a0', 'write', 'PASS', 1)
+    infected = log.append('a0', 'infection', payload={'elapsed': 1.1, 'provenance_paths': [[]]})
+    seed_message = executed('a0', 'send', '__messages__/a1/note', 1.2,
+                            provenance_paths=[[infected.seq]])
+    read = executed('a1', 'receive', '__messages__/a1/note', 1.3)
+    secondary = log.append('a1', 'infection', payload={
+        'elapsed': 1.4, 'provenance_paths': [[infected.seq, seed_message.seq, read.seq]]})
+    forward = executed('a1', 'send', '__messages__/a2/note', 2,
+                       provenance_paths=[[secondary.seq]])
+    downstream_read = executed('a2', 'receive', '__messages__/a2/note', 3)
+    downstream = log.append('a2', 'infection', payload={
+        'elapsed': 4, 'provenance_paths': [[secondary.seq, forward.seq, downstream_read.seq]]})
+    independent = executed('a1', 'write', 'reports/export.py', 5)
+    events = log.read()
+    assert provenance_paths(forward) == [[secondary.seq]]
+    cache = {e.payload['action_id']: decision(e.payload['action_id'], e.agent_id,
+                                             at=e.payload['elapsed'])
+             for e in events if e.kind == 'action_executed'}
+    cache[source.payload['action_id']] = decision(source.payload['action_id'], 'a0',
+                                                  label='violation', at=1.05)
+    cache[independent.payload['action_id']] = decision(independent.payload['action_id'], 'a1',
+                                                       label='violation', at=5.5)
+    result = replay_arm(events, cache, spec_hash='spec', arm='verify')
+    assert not any(c['kind'] == 'trace' for c in result.controls)
+    retained = {e.seq for e in result.retained}
+    assert infected.seq not in retained and forward.seq not in retained
+    assert secondary.seq not in retained and downstream.seq not in retained
+    assert independent.seq in retained
+
+
+def test_result_provenance_rejects_conflicts_and_invalid_event_references():
+    forward = action(4, 'a1', 3, 'send', 'message', result={'provenance_paths': [[2]]})
+    assert provenance_paths(forward) == [[2]]
+    forward.payload['provenance_paths'] = [[1]]
+    with pytest.raises(ValueError, match='Conflicting'):
+        provenance_paths(forward)
+    forward.payload.pop('provenance_paths')
+    for invalid in ([[True]], [[4]], [[]], []):
+        forward.payload['result']['provenance_paths'] = invalid
+        with pytest.raises(ValueError, match='provenance'):
+            provenance_paths(forward)
+
+
+def test_real_empty_inbox_is_successful_without_phantom_graph_edge(tmp_path):
+    log = EventLog(tmp_path / 'events.jsonl')
+    log.append('a0', 'action_executed', paths=[], payload={
+        'elapsed': 1, 'action_id': 'empty',
+        'action': {'tool': 'read-inbox', 'operation': 'receive', 'paths': [], 'input': {}},
+        'result': {'ok': True, 'messages': []}})
+    assert rebuild(log.read()).edges == []

@@ -23,10 +23,35 @@ def freeze_windows(freezes=(), controls=()):
     return windows
 
 
+def provenance_paths(event):
+    """Canonical causal contract for truth events and executed tool results.
+
+    A tool result's dependencies are observed source versions, not policy
+    labels. Independent actions have no provenance field; only exposure and
+    first-source infection may carry an unconditional empty path.
+    """
+    top = event.payload.get('provenance_paths')
+    result = event.payload.get('result', {})
+    nested = result.get('provenance_paths') if event.kind == 'action_executed' and isinstance(result, dict) else None
+    if top is not None and nested is not None and top != nested:
+        raise ValueError(f'Conflicting provenance at seq {event.seq}')
+    paths = top if top is not None else nested
+    if paths is None:
+        if event.kind in {'infection', 'exposure'}:
+            raise ValueError(f'Missing infection provenance at seq {event.seq}')
+        return None
+    if (not isinstance(paths, list) or not paths
+            or not all(isinstance(path, list) for path in paths)
+            or any(not path for path in paths) and event.kind not in {'infection', 'exposure'}
+            or any(type(seq) is not int or seq < 1 or seq >= event.seq for path in paths for seq in path)):
+        raise ValueError(f'Invalid provenance at seq {event.seq}')
+    return paths
+
+
 def infection_survives(infection, pruned):
-    paths = infection.payload.get('provenance_paths')
-    if not isinstance(paths, list) or not paths or not all(isinstance(path, list) for path in paths):
-        raise ValueError(f'Missing infection provenance at seq {infection.seq}')
+    paths = provenance_paths(infection)
+    if paths is None:
+        raise ValueError(f'Missing causal provenance at seq {infection.seq}')
     return any(not (set(path) & pruned) for path in paths)
 
 
@@ -45,9 +70,7 @@ def pruned_seqs(events, freezes=(), controls=()):
     while changed:
         changed = False
         for event in events:
-            if event.seq not in pruned and (
-                    event.kind in {'infection', 'exposure'}
-                    or 'provenance_paths' in event.payload):
+            if event.seq not in pruned and provenance_paths(event) is not None:
                 if not infection_survives(event, pruned):
                     pruned.add(event.seq)
                     changed = True
@@ -85,7 +108,7 @@ def attribute(infection, events, freezes=(), controls=()):
     """
     pruned = pruned_seqs(events, freezes, controls)
     index = {event.seq: event for event in events}
-    for path in infection.payload['provenance_paths']:
+    for path in provenance_paths(infection):
         if set(path) & pruned:
             continue
         if not path:

@@ -11,7 +11,7 @@ import math
 from belowone.graph.trust import TrustGraph
 from belowone.policy.modes import effective_radius
 from .decisions import bind_actions, decision_time, trace_key
-from .replay import _elapsed, infection_survives, replay_freeze_schedule, replay_no_defense
+from .replay import _elapsed, infection_survives, provenance_paths, replay_freeze_schedule, replay_no_defense
 from .graph import record
 
 ARMS = ('no-defense', 'prompt-only', 'periodic-review', 'message-only',
@@ -124,7 +124,7 @@ def replay_arm(events, decisions, *, spec_hash, arm='verify', radius=2,
         if kind == 'event':
             event = value
             if (event.agent_id in freeze_started and at > freeze_started[event.agent_id]
-                    or 'provenance_paths' in event.payload and not infection_survives(event, pruned)):
+                    or provenance_paths(event) is not None and not infection_survives(event, pruned)):
                 pruned.add(event.seq)
                 continue
             record(graph, event)

@@ -47,7 +47,8 @@ class Engine:
             record_graph(self.graph, event)
             if event.kind in {'freeze', 'release', 'kill'}:
                 self.lifecycle.transition(event.agent_id, event.kind)
-            elif event.kind == 'decision' and event.payload.get('label') == 'clean':
+            elif (event.kind == 'decision' and event.payload.get('label') == 'clean'
+                  and event.payload.get('layer') not in {'off', 'lifecycle'}):
                 self.graph.last_clean[event.agent_id] = event.seq
 
     def _elapsed(self, elapsed=None):
@@ -94,13 +95,17 @@ class Engine:
                 'signal': check.get('signal', 'allow'), 'layer': check.get('layer', 'lifecycle'),
                 'uncertain': bool(check.get('uncertain', False))}
 
+    async def wait_pending_traces(self):
+        """Finish observed-contact reviews before a harness starts another model turn."""
+        while self._trace_tasks:
+            queued = list(self._trace_tasks)
+            await asyncio.gather(*queued)
+            self._trace_tasks = [task for task in self._trace_tasks if task not in queued]
+
     async def decide(self, agent_id, action):
         self.lifecycle.state(agent_id)
         normalized = self._action(action)
-        queued = list(self._trace_tasks)
-        if queued:
-            await asyncio.gather(*queued)
-            self._trace_tasks = [task for task in self._trace_tasks if task not in queued]
+        await self.wait_pending_traces()
         async with self._decisions_lock:
             with self._lock:
                 action_id = action.get('action_id', f'{agent_id}:{len(self.event_log.read()) + 1}')
@@ -275,7 +280,7 @@ class Engine:
                     record_graph(self.graph, event)
                 self.detector.tallies.observe(agent_id, normalized, progress=pending['progress'],
                                              cost_usd=result.get('cost_usd', 0))
-                if answer['label'] == 'clean':
+                if answer['label'] == 'clean' and answer['layer'] not in {'off', 'lifecycle'}:
                     self.graph.last_clean[agent_id] = event.seq
                 self._latest[agent_id] = {**normalized, 'input': {**normalized['input'], 'observed_result': deepcopy(result)}}
                 if normalized['operation'] == 'send':
