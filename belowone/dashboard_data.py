@@ -6,11 +6,19 @@ hand-typed here. `synthetic` labels fixture data on the page.
 from __future__ import annotations
 
 
-def agent_state(events, freezes) -> dict[str, str]:
-    """Per agent: clean | infected | frozen. Infection = ground-truth event."""
-    frozen_agents = {a for a, _ in freezes}
+def agent_state(events, freezes, controls=()) -> dict[str, str]:
+    """End-of-replay state per agent. freezes: (agent, elapsed) pairs;
+    controls: full sourced control records. Last control wins — a release
+    returns the agent to active, a kill/end is terminal."""
+    from .eval.replay import freeze_windows
+
+    frozen_at = {agent: start for agent, start, _ in
+                 freeze_windows(freezes, controls)}
     infected = {getattr(ev, "agent_id", None) for ev in events
                 if getattr(ev, "kind", None) == "infection"}
+    killed = {c["agent_id"] for c in controls
+              if c.get("kind") in {"kill", "end"}}
+    released = {c["agent_id"] for c in controls if c.get("kind") == "release"}
     agents: dict[str, str] = {}
     for ev in events:
         a = getattr(ev, "agent_id", None)
@@ -18,8 +26,13 @@ def agent_state(events, freezes) -> dict[str, str]:
             agents[a] = "clean"
     for a in infected:
         agents[a] = "infected"
-    for a in frozen_agents:
+    for a in frozen_at:
         agents[a] = "frozen"
+    for a in killed:
+        agents[a] = "killed"
+    for a in released:
+        if a not in frozen_at and a not in killed and a not in infected:
+            agents[a] = "clean"
     return agents
 
 
@@ -48,14 +61,19 @@ def counters(outbreak: dict, drift: dict | None = None) -> list[dict]:
     return rows
 
 
-def snapshot(events, freezes, outbreak: dict, drift: dict | None = None,
-             synthetic: bool = True, spec_path: str = "goal-spec.json") -> dict:
-    """One page payload: graph nodes, DIRECTIONAL write->read agent edges,
-    counters, provenance label. Events are the counterfactually pruned log
-    (KTD6), so replayed panels never show actions a defense prevented."""
+def snapshot(events, controls, outbreak: dict, drift: dict | None = None,
+             synthetic: bool = True) -> dict:
+    """One page payload. controls are the FULL sourced control records from
+    the evaluator (freeze/release/kill/steer/trace with order); freeze pairs
+    for pruning derive from them. Clock events keep the retained FULL payload
+    (provenance included, so the evaluator can re-consume them); control
+    records are cited with synthetic keys "C<order>", never fake ground-truth
+    seq ids."""
     from .eval.graph import rebuild
-    from .eval.replay import prune_log
-    kept = prune_log(events, freezes)
+    from .eval.replay import freeze_windows, prune_log
+    freezes = [(c["agent_id"], float(c["elapsed"])) for c in controls
+               if c.get("kind") in {"freeze", "kill", "end"}]
+    kept = prune_log(events, freezes, controls)
     graph = rebuild(kept)
     writes = {e["seq"]: e for e in graph.edges if e["operation"] == "write"}
     edges = []
@@ -70,18 +88,16 @@ def snapshot(events, freezes, outbreak: dict, drift: dict | None = None,
                       "operation": "write->read"})
     return {
         "synthetic": synthetic,
-        "agents": agent_state(kept, freezes),
+        "agents": agent_state(kept, freezes, controls),
         "edges": edges,
         "counters": counters(outbreak, drift),
-        "controls": sorted(
-            [{"seq": ev.seq, "agent_id": getattr(ev, "agent_id", None),
-              "kind": getattr(ev, "kind", None), "elapsed":
-              (ev.payload or {}).get("elapsed")}
-             for ev in kept
-             if getattr(ev, "kind", None) in ("freeze", "release", "steer",
-                                              "trace")],
-            key=lambda c: c["elapsed"] or 0,
-        ),
+        "controls": [
+            {"seq": f"C{c.get('order', i)}",
+             "agent_id": c.get("agent_id"), "kind": c.get("kind"),
+             "elapsed": c.get("elapsed")}
+            for i, c in enumerate(sorted(controls,
+                                         key=lambda c: c.get("elapsed", 0)))
+        ],
         "time_since_poisoning_s": min(
             ((ev.payload or {}).get("elapsed") for ev in kept
              if getattr(ev, "kind", None) == "infection"),

@@ -125,9 +125,11 @@ def test_doc_checker_fails_on_edited_number_and_passes_clean(tmp_path):
 
 def test_reproduce_cycle_clean_on_committed_pilot_artifacts(capsys):
     from belowone.experiments import reproduce
-    assert reproduce(ROOT / "experiments/committed/runs") == []
-    # the one honest skip per run is reported, not silently dropped
-    assert capsys.readouterr().out.count("SKIP") == 3
+    diffs = reproduce(ROOT / "experiments/committed/runs")
+    assert diffs == []
+    # the honest meter-classified skip per run is reported, not dropped
+    out = capsys.readouterr().out
+    assert out.count("SKIP (not recomputable from events)") >= 3
 
 
 def test_live_commands_fail_loud_without_keys_or_harness():

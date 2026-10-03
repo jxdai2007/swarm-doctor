@@ -25,6 +25,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -113,10 +114,13 @@ def build_pages() -> dict[str, str]:
         events.append(SimpleNamespace(
             seq=e["seq"], agent_id=e.get("agent_id"), kind=e.get("kind"),
             paths=e.get("paths") or [], payload=e.get("payload") or {}))
-    freezes = sorted({(e.agent_id, float(e.payload.get("elapsed", 0)))
-                      for e in events if e.kind == "freeze"})
-    om = outbreak_metrics(replay_freeze_schedule(events, freezes), events,
-                          seed=0)
+    controls = [{"agent_id": e.agent_id, "kind": e.kind,
+                 "elapsed": float(e.payload.get("elapsed", 0)),
+                 "order": e.seq}
+                for e in events
+                if e.kind in {"freeze", "release", "kill", "end"}]
+    om = outbreak_metrics(replay_freeze_schedule(events, controls=controls),
+                          events, seed=0)
     summary = json.loads((run / "summary.json").read_text())
     meter = {"total_usd": sum(float(c["cost_usd"])
                               for c in summary.get("live_model_calls", [])),
@@ -145,6 +149,14 @@ def build_pages() -> dict[str, str]:
                                page("Below One", "<pre>"
                                     + html.escape(close) + "</pre>"))
     return urls
+
+
+def assert_board(base: str, url: str) -> None:
+    """HTTP 200 on the snapshot of the run the page will stream."""
+    run = url.split("run=")[-1]
+    status = urllib.request.urlopen(
+        f"{base}/snapshot?run={run}", timeout=5).status
+    assert status == 200, f"snapshot for {run} not 200"
 
 
 def main() -> int:
@@ -182,18 +194,11 @@ def main() -> int:
 
     import urllib.request
 
-    def assert_board(url: str, want_events: bool) -> None:
-        """HTTP 200 on the snapshot of the run the page will stream."""
-        run = url.split("run=")[-1]
-        status = urllib.request.urlopen(
-            f"{args.base}/snapshot?run={run}", timeout=5).status
-        assert status == 200, f"snapshot for {run} not 200"
-
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
         for name, url, seconds, kind in beats:
             try:
-                capture_one(pw, name, url, seconds, kind, out)
+                capture_one(pw, name, url, seconds, kind, out, args.base)
             except (SystemExit, AssertionError) as error:
                 print(f"SKIPPED: {name}: {error}")
                 continue
@@ -204,11 +209,11 @@ def main() -> int:
     return 0
 
 
-def capture_one(pw, name, url, seconds, kind, out):
+def capture_one(pw, name, url, seconds, kind, out, base):
     """One browser per beat so an abort never loses the remaining beats."""
     browser = pw.chromium.launch()
     if kind in ("board", "board-events"):
-        assert_board(url, kind == "board-events")
+        assert_board(base, url)
     context = browser.new_context(
         viewport={"width": 1440, "height": 900},
         record_video_dir=str(out / "_raw"),

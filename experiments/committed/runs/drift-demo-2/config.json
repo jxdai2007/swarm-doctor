@@ -1,0 +1,1 @@
+{"agent_count":3,"arm":"verify","checks_source":"immutable-post-run-shadow","metrics_all_arms_source":"counterfactual-replay","model_turn_budget":20,"prevention":false,"scenario":"drift","seed":0,"served_models":["synthetic-dev-kimi"],"source":"synthetic-development","spec_hash":"9586725e8c8f72eb411f74947e1fd9dd35cbe216b87bc9b9b27344102b30346a","synthetic":true}

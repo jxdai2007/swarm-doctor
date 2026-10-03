@@ -1,0 +1,1 @@
+{"chosen_scenario":"outbreak","live_verification":"blocked: live credentials required","reason":"secondary spread observed","runs":["pilot-0","pilot-1","pilot-2"],"secondary_infections":[1,1,1],"seeds":[0,1,2],"source":"synthetic-development","synthetic":true}

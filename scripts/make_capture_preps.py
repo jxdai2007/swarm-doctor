@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 RUNS = ROOT / "experiments" / "committed" / "runs"
+DISPLAY = ROOT / "experiments" / "display"
 
 
 def head_hash() -> str:
@@ -54,11 +55,13 @@ def drift_demo(commit: str) -> Path:
     ]}
     clients = synthetic_clients(cache, meter, spread=False, scripts=scripts)
     workspace = Path(tempfile.mkdtemp(prefix="u13-drift-ws-"))
-    asyncio.run(run(store, "drift-demo-2", seed=0, arm="verify",
+    import time as _t
+    asyncio.run(run(store, f"drift-demo-{int(_t.time())}", seed=0, arm="verify",
                     scenario="drift", clients=clients,
                     workspace_root=str(workspace), commit=commit,
                     agent_count=3, steps=20))
-    folder = RUNS / "drift-demo-2"
+    import glob as _g
+    folder = Path(sorted(_g.glob(str(RUNS / "drift-demo-*")))[-1])
     kinds = [json.loads(line)["kind"]
              for line in (folder / "events.jsonl").read_text().splitlines()
              if line.strip()]
@@ -90,12 +93,10 @@ def split_derived(commit: str) -> list[Path]:
     written = []
     for arm in ("no-defense", "prompt-only", "verify"):
         result = replay_arm(events, decisions, spec_hash=digest, arm=arm)
-        controls = [(c["agent_id"], float(c["elapsed"]))
-                    for c in result.controls
-                    if c["kind"] in {"freeze", "release", "kill"}]
         metrics = {**outbreak_metrics(result), **drift_metrics(
-            events, controls, total_agents=agents)}
-        snap = snapshot(result.events, controls, metrics, synthetic=True)
+            events, controls=result.controls, total_agents=agents)}
+        snap = snapshot(result.events, result.controls, metrics,
+                        synthetic=True)
         snap["provenance"] = {
             "source_run": "pilot-0", "source_commit": commit,
             "spec_hash": digest, "arm": arm,
@@ -116,7 +117,7 @@ def split_derived(commit: str) -> list[Path]:
                                     (e.get("payload") or {}).get("source_agent")},
                 }) + "\n")
         written.append(out)
-        print(f"derived-{arm}: infected={metrics['infected']} "
+        print(f"display/{out.name}: infected={metrics['infected']} "
               f"r={metrics['r_mean']}")
     return written
 

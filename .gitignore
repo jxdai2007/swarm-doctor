@@ -9,4 +9,4 @@ __pycache__/
 node_modules/
 .unlazy/
 .DS_Store
-runs/
+/runs/

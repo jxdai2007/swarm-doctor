@@ -48,7 +48,7 @@ def main() -> int:
     engine = Engine(spec, EventLog(root / "events.jsonl"), detector,
                     agent_ids=["a0", "a1", "a2", "a3"], synthetic=True)
     app = create_app(engine, operator_token=secrets.token_urlsafe(32),
-                     artifact_root=ROOT / "experiments" / "committed" / "runs",
+                     artifact_root=ROOT / "experiments" / "display",
                      dashboard_dir=ROOT / "dashboard")
     import uvicorn
     print(f"engine dashboard on http://127.0.0.1:{port}/?run=live "
