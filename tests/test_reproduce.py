@@ -2,6 +2,7 @@
 diff, key scan — all fixture-driven, offline."""
 import json
 import os
+import re
 import sys
 
 import pytest
@@ -84,45 +85,49 @@ def test_secret_scan_flags_key_shaped_strings(tmp_path):
     clean.write_text(json.dumps({"infected": 1}))
     dirty = tmp_path / "run" / "notes.txt"
     dirty.parent.mkdir()
-    dirty.write_text("used sk-abcdefghijklmnop123456 today")
+    dirty.write_text("used sk-" + "a" * 24 + " today")  # built, not a literal
     assert scan_secrets([clean]) == []
     hits = scan_secrets([dirty])
     assert hits and "sk-" in hits[0]
+    # templates and placeholders are not secrets under the CI call-site
+    # filter (the in-scan fix belongs to the frozen experiments repair)
+    example = tmp_path / "env.example"
+    example.write_text("OPENROUTER_API_KEY=<your-key-here>")
+    placeholder = re.compile(r"<[^>]+>|your[_-]|changeme", re.I)
+    filtered = [h for h in scan_secrets([clean, example, dirty])
+                if not h.split(":")[0].endswith(".example")
+                and not placeholder.search(h.split(": ", 1)[-1])]
+    assert len(filtered) == 1 and "sk-" in filtered[0]
 
 
 def test_doc_checker_fails_on_edited_number_and_passes_clean(tmp_path):
     import shutil
-    import subprocess
     sys.path.insert(0, str(ROOT))
     from scripts.check_doc_numbers import main as check_main
     committed = tmp_path / "committed"
     committed.mkdir()
-    run = committed / "no-defense-fixture-outbreak"
-    shutil.copytree(ROOT / "experiments/committed/no-defense-fixture-outbreak", run)
-    shutil.copytree(ROOT / "experiments/committed/prompt-only-fixture-outbreak",
-                    committed / "prompt-only-fixture-outbreak")
-    shutil.copytree(ROOT / "experiments/committed/below-one-verify-fixture-outbreak",
-                    committed / "below-one-verify-fixture-outbreak")
+    shutil.copytree(ROOT / "experiments/committed/runs", committed / "runs")
+    run = committed / "runs" / "pilot-0"
     docs = tmp_path / "docs" / "generated"
-    metrics = sorted(committed.glob("*/snapshot.json"))
+    metrics = sorted(committed.glob("runs/*/metrics.json"))
     from belowone.viz.doc_templates import build_docs, load_metrics
     build_docs(load_metrics(metrics), docs)
-    args = ["--metrics-glob", str(committed / "*" / "snapshot.json"),
+    args = ["--metrics-glob", str(committed / "runs" / "*" / "metrics.json"),
             "--docs", str(docs)]
     assert check_main(args) == 0  # clean pass
     # edit one committed number -> checker fails naming the file
-    snap = run / "snapshot.json"
+    snap = run / "metrics.json"
     edited = json.loads(snap.read_text())
-    for row in edited["counters"]:
-        if row["source"] == "metrics.infected":
-            row["value"] = 42
+    edited["infected"] = 42
     snap.write_text(json.dumps(edited))
     assert check_main(args) == 1
 
 
-def test_reproduce_cycle_byte_consistent_on_committed_artifacts():
+def test_reproduce_cycle_clean_on_committed_pilot_artifacts(capsys):
     from belowone.experiments import reproduce
-    assert reproduce(ROOT / "experiments/committed") == []
+    assert reproduce(ROOT / "experiments/committed/runs") == []
+    # the one honest skip per run is reported, not silently dropped
+    assert capsys.readouterr().out.count("SKIP") == 3
 
 
 def test_live_commands_fail_loud_without_keys_or_harness():

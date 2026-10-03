@@ -20,7 +20,7 @@ from belowone.viz.doc_templates import build_docs, load_metrics  # noqa: E402
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--metrics-glob", default="experiments/committed/*/snapshot.json")
+    parser.add_argument("--metrics-glob", default="experiments/committed/runs/*/metrics.json")
     parser.add_argument("--docs", default="docs/generated")
     args = parser.parse_args(argv)
 
@@ -32,7 +32,9 @@ def main(argv=None) -> int:
     if not metric_files:
         print("no committed metrics artifacts found under", args.metrics_glob)
         return 1
-    metrics = load_metrics(metric_files)
+    metrics = load_metrics(
+        [p for p in metric_files if p.name in ("metrics.json",
+                                               "snapshot.json")])
     docs = Path(args.docs)
     if not docs.is_absolute():
         docs = ROOT / docs

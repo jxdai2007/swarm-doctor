@@ -47,13 +47,28 @@ def sample_from_recordings(run_dirs: list[Path], per_stratum: int = 50,
     denials are sampled alongside executed actions (violation trips usually
     DENY the action — executed-only sampling would bias the sample clean).
 
-    Trust: when several decisions exist for one action (e.g. interviewed vs
-    one-line spec), the caller MUST pass the trusted spec_hash; ambiguity
-    without one raises rather than silently taking the last record.
+    Trust: the trusted spec_hash comes from the run's own config.json when
+    every run agrees; mixed configs REQUIRE an explicit spec_hash argument
+    (no silent last-wins).
 
-    Stable event id = "<run>:<seq>". Events without a recorded label for the
-    selected spec are excluded (no guessed strata)."""
+    Stable event id = "<run>:<proposal seq>" (one row per action, deduped).
+    Events without a recorded label for the selected spec are excluded (no
+    guessed strata)."""
     rows: dict[str, dict] = {}
+    if spec_hash is None:
+        hashes = set()
+        for run_dir in run_dirs:
+            config = Path(run_dir) / "config.json"
+            if config.is_file():
+                cfg = json.loads(config.read_text())
+                if cfg.get("spec_hash"):
+                    hashes.add(cfg["spec_hash"])
+        if len(hashes) == 1:
+            spec_hash = hashes.pop()
+        elif len(hashes) > 1:
+            raise ValueError(
+                f"runs contain {len(hashes)} different spec hashes "
+                f"{sorted(hashes)}; pass the trusted --spec-hash")
     for run_dir in run_dirs:
         run = Path(run_dir).name
         decisions: dict[str, str] = {}

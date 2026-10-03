@@ -10,12 +10,20 @@ from pathlib import Path
 
 
 def load_metrics(paths: list[Path]) -> dict:
-    """{run_name: {source_key: value}} from metrics/snapshot files."""
+    """{run_name: {token_key: value}}. metrics.json (U9 authoritative
+    evaluation) maps to metrics.<key>; snapshot.json counters map to their
+    source citations."""
     out = {}
     for path in paths:
-        snap = json.loads(Path(path).read_text())
-        rows = {row["source"]: row["value"] for row in snap.get("counters", [])}
-        out[Path(path).parent.name] = rows
+        path = Path(path)
+        snap = json.loads(path.read_text())
+        if path.name == "metrics.json":
+            out[path.parent.name] = {f"metrics.{k}": v
+                                     for k, v in snap.items()
+                                     if not isinstance(v, (dict, list))}
+        else:
+            out[path.parent.name] = {row["source"]: row["value"]
+                                     for row in snap.get("counters", [])}
     return out
 
 
@@ -45,9 +53,9 @@ TEMPLATES = {
 
 | metric | no-defense | prompt-only | below-one-verify |
 |---|---|---|---|
-| Infected agents | {no-defense-fixture-outbreak.metrics.infected} | {prompt-only-fixture-outbreak.metrics.infected} | {below-one-verify-fixture-outbreak.metrics.infected} |
-| R (secondary per infected) | {no-defense-fixture-outbreak.metrics.r_mean} | {prompt-only-fixture-outbreak.metrics.r_mean} | {below-one-verify-fixture-outbreak.metrics.r_mean} |
-| Wasted spend (USD) | {no-defense-fixture-outbreak.metrics.wasted_spend_usd} | {prompt-only-fixture-outbreak.metrics.wasted_spend_usd} | {below-one-verify-fixture-outbreak.metrics.wasted_spend_usd} |
+| Infected agents | {pilot-0.metrics.infected} | {pilot-1.metrics.infected} | {pilot-2.metrics.infected} |
+| R (secondary per infected) | {pilot-0.metrics.r_mean} | {pilot-1.metrics.r_mean} | {pilot-2.metrics.r_mean} |
+| Wasted spend (USD) | {pilot-0.metrics.wasted_spend_usd} | {pilot-1.metrics.wasted_spend_usd} | {pilot-2.metrics.wasted_spend_usd} |
 
 Every value regenerates from committed run artifacts with `make reproduce`
 (no network, no API keys). Live-model results are reported only when real
@@ -56,9 +64,9 @@ pilot recordings exist; synthetic artifacts are labeled SYNTHETIC DEV.
     "writeup-metrics.md": """\
 ## Results
 
-- Outbreak arm `below-one-verify`: infected = {below-one-verify-fixture-outbreak.metrics.infected},
-  R = {below-one-verify-fixture-outbreak.metrics.r_mean}, wasted spend =
-  {below-one-verify-fixture-outbreak.metrics.wasted_spend_usd}.
+- Outbreak arm `below-one-verify`: infected = {pilot-2.metrics.infected},
+  R = {pilot-2.metrics.r_mean}, wasted spend =
+  {pilot-2.metrics.wasted_spend_usd}.
 - Hypotheses H1-H7: **unmeasured — SYNTHETIC DEV fixture data only.** No
   hypothesis is claimed as measured until real pilot recordings and live
   validation runs exist (R30/R33).

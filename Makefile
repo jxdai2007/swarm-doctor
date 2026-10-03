@@ -14,7 +14,7 @@ experiments:
 	uv run --frozen python -m belowone.experiments experiments
 
 reproduce:
-	uv run --frozen python -m belowone.experiments reproduce --runs experiments/committed
+	uv run --frozen python -m belowone.experiments reproduce --runs experiments/committed/runs
 
 rerun:
 	uv run --frozen python -m belowone.experiments rerun

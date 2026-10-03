@@ -12,7 +12,6 @@ are OPERATOR-ONLY; agents never write labels):
 ```
 # 1. build the stratified sample from pilot recordings (~150 events)
 uv run python -m belowone.eval.monitor sample --runs runs \
-  --spec-hash <pinned-spec-hash> \
   --runs runs --per-stratum 50 --seed 0 --out labels/sample.jsonl
 
 # 2. label (operator-only; quit any time with Ctrl-C — progress is saved)
