@@ -22,6 +22,7 @@ class Tracer:
         seen = {initial}
         frontier = [initial]
         reached, confirmed, rings = [], [], []
+        precaution = set()  # frozen by THIS trace, safe to release on review
         for depth in range(1, radius + 1):
             contacts = {}
             for source in frontier:
@@ -38,6 +39,7 @@ class Tracer:
                 self._emit(agent, 'trace', {'ring': depth, **contacts[agent]})
                 if self.mode == 'strict' and self.lifecycle.allowed(agent):
                     self.lifecycle.transition(agent, 'freeze')
+                    precaution.add(agent)
                     self._emit(agent, 'freeze', {'reason': 'Strict-mode trace contact'})
             results = await asyncio.gather(*(self.check(agent) for agent in ring), return_exceptions=True)
             frontier = []
@@ -45,7 +47,8 @@ class Tracer:
                 if isinstance(result, BaseException) or result.get('uncertain', False):
                     continue
                 label = result.get('label')
-                if label == 'violation' and self.lifecycle.allowed(agent):
+                terminal = self.lifecycle.state(agent) in {'killed', 'ended'}
+                if label == 'violation' and not terminal:
                     self.lifecycle.transition(agent, 'freeze')
                     # Taint from first causal contact, not clean activity before exposure.
                     clean_point = min(self.graph.last_clean[agent], contacts[agent]['seq'] - 1)
@@ -54,18 +57,20 @@ class Tracer:
                     confirmed.append(agent)
                     frontier.append(agent)
                 elif label == 'drift':
-                    # Contacted drift is steered, never contained: strict mode
-                    # releases the precautionary freeze, then steers.
-                    if self.mode == 'strict' and self.lifecycle.state(agent) == 'frozen':
+                    # Contacted drift is steered, never contained: release only
+                    # THIS trace's precautionary freeze, then steer.
+                    if agent in precaution:
                         self.lifecycle.transition(agent, 'release')
                         self.graph.release(agent)
+                        precaution.discard(agent)
                         self._emit(agent, 'release', {'reason': 'Drift is not a violation'})
                     if self.lifecycle.allowed(agent):
                         self.lifecycle.transition(agent, 'steer')
                         self._emit(agent, 'steer', {'reason': result.get('reason', 'Drift at trace contact')})
-                elif label == 'clean' and self.mode == 'strict' and self.lifecycle.state(agent) == 'frozen':
+                elif label == 'clean' and agent in precaution:
                     self.lifecycle.transition(agent, 'release')
                     self.graph.release(agent)
+                    precaution.discard(agent)
                     self._emit(agent, 'release', {'reason': 'Clean trace review'})
             if not frontier:
                 break
