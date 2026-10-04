@@ -68,4 +68,6 @@ class JevClient(OpenRouterClient):
         try:
             return await self._request(payload, endpoint='/decisions')
         except ModelCallError as exc:
+            if self.meter.stop_reason:
+                raise
             return exc.response

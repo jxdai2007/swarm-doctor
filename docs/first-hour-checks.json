@@ -1,15 +1,15 @@
 [
   {
     "check": "kimi_identity_call",
-    "status": "FAIL",
-    "detail": "operator action needed: KIMI_API_KEY missing",
-    "fallback": "synthetic development responses; cached-only replay; live runs blocked"
+    "status": "PASS",
+    "detail": "served model: kimi-for-coding",
+    "fallback": null
   },
   {
     "check": "jev_decisions_call",
-    "status": "FAIL",
-    "detail": "operator action needed: OPENROUTER_API_KEY missing",
-    "fallback": "synthetic development responses; cached-only replay; live runs blocked"
+    "status": "PASS",
+    "detail": "served model: typesafe/jev-1.13-20260917",
+    "fallback": null
   },
   {
     "check": "openrouter_models_fallback",
@@ -19,26 +19,26 @@
   },
   {
     "check": "omp_noninteractive_extension",
-    "status": "PASS",
-    "detail": "exit=0; extension observed=True; builder Codex probe, not Kimi experiment",
-    "fallback": null
+    "status": "FAIL",
+    "detail": "TimeoutExpired",
+    "fallback": "experiment harness; deny-reason steer; unknown shell paths"
   },
   {
     "check": "extension_local_http",
-    "status": "PASS",
-    "detail": "3 local callbacks observed",
-    "fallback": null
+    "status": "FAIL",
+    "detail": "TimeoutExpired",
+    "fallback": "experiment harness; deny-reason steer; unknown shell paths"
   },
   {
     "check": "omp_result_file_paths",
-    "status": "PASS",
-    "detail": "tool result includes path in input or content",
-    "fallback": null
+    "status": "FAIL",
+    "detail": "TimeoutExpired",
+    "fallback": "experiment harness; deny-reason steer; unknown shell paths"
   },
   {
     "check": "omp_steer_redirection",
-    "status": "PASS",
-    "detail": "steer delivered and corrected final output",
-    "fallback": null
+    "status": "FAIL",
+    "detail": "TimeoutExpired",
+    "fallback": "experiment harness; deny-reason steer; unknown shell paths"
   }
 ]

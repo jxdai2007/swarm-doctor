@@ -717,9 +717,9 @@ async def _live_study(args):
                 store.write_json(folder, 'incomplete.json', accounting)
                 store.seal(folder)
             incomplete.append({'run': name, **accounting})
-            # Kimi's bounded outage can switch only at the next seed. An
-            # exhausted fallback or reserve must not authorize another call.
-            paid_stopped = not isinstance(error, QuotaPending) or provider == 'openrouter'
+            # This campaign stops at any failure; quota never authorizes a
+            # reset wait or another seed on the paid fallback.
+            paid_stopped = True
             return None, str(error)
         rows.append({'run': name, 'experiment': label, **summary})
         return out / name, None

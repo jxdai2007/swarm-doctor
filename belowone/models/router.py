@@ -16,10 +16,15 @@ class ModelRouter:
 
     def quota_exhausted(self):
         self._quota_exhausted = True
+        if self.kimi.max_quota_wait_seconds == 0:
+            self.kimi.meter.stop_reason = self.kimi.meter.stop_reason or 'Kimi provider quota exhausted; campaign stopped without retry or fallback'
 
     def begin_run(self, run_id, *, seed=None):
         if self.run_id is not None:
             raise RuntimeError('run already active')
+        if self.kimi.meter.stop_reason:
+            from belowone.models.kimi import QuotaPending
+            raise QuotaPending(self.kimi.meter.stop_reason)
         report = self.kimi.meter.report()
         from decimal import Decimal
         if report['budget_breached'] or Decimal(report['spent_usd']) + Decimal(report['reserved_usd']) >= Decimal(report['cap_usd']):

@@ -325,3 +325,63 @@ async def test_transient_retry_exhaustion_does_not_mark_quota(tmp_path):
             await kimi.chat([])
         router.end_run()
         assert router.begin_run('seed1', seed=1) is kimi
+
+
+async def test_live_quota_stops_queued_calls_and_next_seed(tmp_path):
+    import asyncio
+    from belowone.models.kimi import ModelCallError
+    sent = []
+    def handle(request):
+        sent.append(request.url.host)
+        return httpx.Response(429, json={'error': {'code': 'quota_exhausted'}})
+    meter = Meter()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        kimi = KimiClient('fake', meter, Cassette(tmp_path), concurrency=1,
+                          max_quota_wait_seconds=0, http=http)
+        fallback = OpenRouterClient('fake', meter, Cassette(tmp_path), http=http)
+        router = ModelRouter(kimi, fallback)
+        router.begin_run('seed0', seed=0)
+        failures = await asyncio.gather(kimi.chat([]), kimi.chat([]), return_exceptions=True)
+        assert all(isinstance(error, ModelCallError) for error in failures)
+        with pytest.raises(ModelCallError):
+            await JevClient('fake', meter, Cassette(tmp_path), http=http).check({}, {})
+        router.end_run()
+        with pytest.raises(ModelCallError):
+            router.begin_run('seed1', seed=1)
+    assert sent == ['api.kimi.com']
+    assert 'provider quota' in meter.stop_reason
+
+
+async def test_live_local_request_ceiling_stops_without_wait_or_send(tmp_path):
+    from belowone.models.kimi import QuotaPending
+    sent = []
+    def handle(request):
+        sent.append(request.url.host)
+        return httpx.Response(200, json={'model': 'served-kimi', 'choices': [{'message': {'content': 'OK'}}],
+                                         'usage': {'prompt_tokens': 1, 'completion_tokens': 1}})
+    meter = Meter()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        kimi = KimiClient('fake', meter, Cassette(tmp_path), requests_per_window=1,
+                          max_quota_wait_seconds=0, http=http)
+        ModelRouter(kimi, OpenRouterClient('fake', meter, Cassette(tmp_path), http=http))
+        await kimi.chat([])
+        with pytest.raises(QuotaPending, match='Local Kimi request-window ceiling'):
+            await kimi.chat([{'role': 'user', 'content': 'next'}])
+    assert sent == ['api.kimi.com']
+    assert 'provider quota not observed' in meter.stop_reason
+
+
+async def test_openrouter_402_halts_judge_without_another_request(tmp_path):
+    from belowone.models.kimi import ModelCallError
+    sent = []
+    def handle(request):
+        sent.append(request.url.host)
+        return httpx.Response(402, json={'error': {'code': 402, 'message': 'Insufficient credits'}})
+    meter = Meter()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        with pytest.raises(BudgetExceeded, match='HTTP 402'):
+            await JevClient('fake', meter, Cassette(tmp_path), http=http).check({}, {})
+        with pytest.raises(ModelCallError):
+            await KimiClient('fake', meter, Cassette(tmp_path), http=http).chat([])
+    assert sent == ['openrouter.ai']
+    assert meter.report()['reserved_usd'] == '0'

@@ -71,6 +71,7 @@ class Meter:
         self._pending: dict[str, Reservation] = {}
         self._calls: list[dict[str, Any]] = []
         self._breached = False
+        self.stop_reason = None
 
     def _spent(self) -> Decimal:
         return _sum(Decimal(call['cost_usd']) for call in self._calls if call['provider'] == 'openrouter')
@@ -84,6 +85,7 @@ class Meter:
         with self._lock:
             if provider == 'openrouter' and (self._breached or
                     _sum((self._spent(), self._reserved(), maximum_cost)) > self.cap_usd):
+                self.stop_reason = 'OpenRouter worst-case reservation exceeds remaining cap; campaign stopped'
                 raise BudgetExceeded('OpenRouter worst-case request would exceed spend cap')
             hold = Reservation(uuid4().hex, provider, maximum_cost)
             self._pending[hold.token] = hold
@@ -145,4 +147,5 @@ class Meter:
                 }
             return scrub({'cap_usd': str(self.cap_usd), 'spent_usd': str(self._spent()),
                           'reserved_usd': str(self._reserved()), 'budget_breached': self._breached,
+                          'stop_reason': self.stop_reason,
                           'providers': providers, 'calls': [dict(call) for call in self._calls]})

@@ -131,13 +131,19 @@ class KimiClient:
         async with self.semaphore:
             while True:
                 while True:
+                    if self.meter.stop_reason:
+                        raise ModelCallError(self.meter.stop_reason)
                     now = time.monotonic()
                     while self.window and now - self.window[0] >= self.window_seconds:
                         self.window.popleft()
                     if len(self.window) < self.requests_per_window:
                         break
+                    if self.max_quota_wait_seconds == 0:
+                        self.meter.stop_reason = 'Local Kimi request-window ceiling reached; campaign stopped (provider quota not observed)'
                     if self.on_quota_exhausted is not None:
                         self.on_quota_exhausted()
+                    if self.max_quota_wait_seconds == 0:
+                        raise QuotaPending(self.meter.stop_reason)
                     await asyncio.sleep(max(0, self.window[0] + self.window_seconds - now))
                 reservation = self._reserve(payload)
                 self.window.append(time.monotonic())
@@ -171,6 +177,17 @@ class KimiClient:
                             self.meter.cancel(reservation)
                         attempt.update(charge_status='uncharged', cost_usd='0',
                                        input_tokens=0, output_tokens=0, reason='rate_limit')
+                    elif response.status_code == 402 and self.provider == 'openrouter':
+                        from belowone.meter import BudgetExceeded
+                        if reservation is not None:
+                            self.meter.cancel(reservation)
+                        self.meter.stop_reason = 'OpenRouter credit exhausted (HTTP 402); campaign stopped'
+                        attempt.update(charge_status='uncharged', cost_usd='0',
+                                       input_tokens=0, output_tokens=0,
+                                       reason=self.meter.stop_reason,
+                                       latency=time.perf_counter() - started)
+                        self._log_attempt(attempt)
+                        raise BudgetExceeded(self.meter.stop_reason)
                     else:
                         if response.is_error:
                             try:

@@ -486,3 +486,25 @@ async def test_launcher_settles_killed_partial_writer_before_next_reader(tmp_pat
             killer.cancel()
             await asyncio.gather(killer, return_exceptions=True)
         await clients.aclose()
+
+
+@pytest.mark.asyncio
+async def test_pilot_failure_seals_partial_and_stops_next_seed(tmp_path, monkeypatch):
+    from belowone.models.kimi import QuotaPending
+    import belowone.harness.schedule as scheduling
+    clients = synthetic_clients(tmp_path / 'cache', Meter())
+    store = RunStore(tmp_path / 'runs')
+    seeds = []
+    async def interrupted(store, name, **kwargs):
+        seeds.append(kwargs['seed'])
+        store.create(name, {'seed': kwargs['seed'], 'synthetic': True}, commit='synthetic-dev')
+        raise QuotaPending('Local Kimi request-window ceiling reached')
+    monkeypatch.setattr(scheduling, 'run', interrupted)
+    summary = await scheduling.pilot(store, clients=clients, workspace_root=tmp_path / 'work',
+                                     commit='synthetic-dev')
+    assert seeds == [0]
+    assert summary['status'] == 'incomplete' and summary['reached_seeds'] == []
+    assert summary['chosen_scenario'] is None
+    assert summary['incomplete_runs'][0]['seed'] == 0
+    assert store.verify(store.root / 'pilot-0')
+    await clients.aclose()

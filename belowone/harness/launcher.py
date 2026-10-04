@@ -169,7 +169,7 @@ def live_clients(cache, meter):
         raise RuntimeError('Live runs require KIMI_API_KEY and OPENROUTER_API_KEY; synthetic DEV is not live verification')
     http = httpx.AsyncClient(trust_env=False)
     cassette = Cassette(cache)
-    return Clients(KimiClient(kimi_key, meter, cassette, http=http),
+    return Clients(KimiClient(kimi_key, meter, cassette, http=http, max_quota_wait_seconds=0),
                    OpenRouterClient(router_key, meter, cassette, http=http),
                    JevClient(router_key, meter, cassette, http=http), synthetic=False, transports=[http])
 
