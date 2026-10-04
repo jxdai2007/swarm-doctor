@@ -1,25 +1,169 @@
-# Below One
+# Swarm Doctor (formerly Below One)
 
-**Keep your swarm's R below one.** Below One is an immune system for coding-agent
-swarms: every agent action lands in a live trust graph, each step is checked
-against a locked goal spec, drifting agents are steered back, and a poisoned
-agent is frozen, traced, and contained before it spreads.
+**Stop the spread.**
 
-Two dials, one engine:
+The story scenes in the demo video are dramatized; every number shown comes from our real recorded runs.
 
-- **Stay on task** (everyone, every day): catches drift — refactor loops, scope
-  creep, flaky-test rabbit holes — and steers the agent back.
-- **Contain outbreaks** (high-stakes runs): verifies violations, freezes the
-  agent, traces exactly which agents it reached, quarantines only the
-  confirmed ones.
+> ## Try it in 2 minutes
+>
+> In Claude Code, add this marketplace, then install the plugin:
+> **Access:** this repository is currently private. Authenticate Git with a
+> GitHub account authorized for it before adding the marketplace or cloning.
+>
+>
+> ```text
+> /plugin marketplace add jxdai2007/swarm-doctor
+> /plugin install swarm-doctor@swarm-doctor
+> ```
+>
+> Select **Install** in the plugin details panel. Restart Claude Code or run
+> `/reload-plugins` if the commands are not visible.
+>
+> ```text
+> /swarm-doctor:doctored-swarm
+> /swarm-doctor:status
+> /swarm-doctor:release
+> ```
+>
+> No Claude Code? Clone and run the offline hook self-test; Python 3 standard
+> library only, no keys, no pip, no model calls:
+>
+> ```bash
+> git clone --branch feat/below-one https://github.com/jxdai2007/swarm-doctor.git
+> cd swarm-doctor
+> python3 plugins/swarm-doctor/scripts/selftest.py
+> ```
+>
+> [Try the outbreak lab](examples/outbreak-lab/LAB.md): compare fresh disposable
+> workspaces with and without the plugin. Live Claude sessions use your account
+> and may incur usage charges; the offline self-test does not.
 
-## Quick start (oh-my-pi swarm)
+![Swarm Doctor demo: stop the spread](docs/img/hero.gif)
+
+## What the plugin does
+
+Interview first, then lock a goal, editable paths, never-touch paths, and a
+pause-or-ask policy. Claude splits the work among 3–4 parallel subagents.
+PreToolUse hooks block off-task edits, trip on secret-looking or forbidden
+paths, and quarantine only the offending session/subagent. PostToolUse hooks
+record reads and writes; a later reader of a quarantined writer's file goes
+on **watch**, not automatically into quarantine.
+
+The plugin is new. **We have not run the live Claude Code lab ourselves yet.**
+Verification pipes synthetic hook JSON into the real Python entry point in
+temporary projects. Research results below are not plugin benchmarks.
+
+### Local CLI
+Python 3.9+ on macOS/Linux (`fcntl` locking); no Python packages required.
+The optional launcher requires authenticated Claude Code **2.1.259+** for
+`--permission-prompts none`. Installing the plugin does not run the launcher.
+
+
+Run from the project you want to protect (or set `CLAUDE_PROJECT_DIR`):
 
 ```bash
-# 0. prerequisites — while the repo default branch is setup-only, clone the
-#    tested branch explicitly:
-git clone --branch feat/below-one https://github.com/jxdai2007/below-one.git
-cd below-one
+DOCTOR=/absolute/path/to/swarm-doctor/plugins/swarm-doctor/scripts/doctor.py
+python3 "$DOCTOR" lock --goal 'Implement CSV export' \
+  --scope 'reports/**,tests/test_export*.py' \
+  --never 'tests/test_reports.py' --on-trip pause --decoy yes
+python3 "$DOCTOR" status
+python3 "$DOCTOR" report
+python3 "$DOCTOR" release --all
+# Optional live launcher; uses your Claude account, not executed in our checks:
+python3 "$DOCTOR" swarm --agents 3 'Implement CSV export without changing protected tests'
+```
+
+State and timestamped events live in `<project>/.swarm-doctor/`. Without
+`spec.json`, hooks do nothing. A decoy is created only if `.env.production`
+does not exist, contains obviously fake values, and is added to `.gitignore`.
+Never-touch paths are **read/write tripwires** in this plugin; an attempted
+protected edit is both blocked and counted. `ask` requests approval for the
+first trip, but the session remains quarantined until release. The headless
+launcher uses `dontAsk`, so requests requiring approval are denied rather
+than bypassed.
+
+This is a tool-hook guard, **not a sandbox or proof of infection**. Bash path
+scanning is heuristic: dynamically constructed paths, subprocess file access,
+and off-tool communication may be invisible. Do not grant untrusted agents
+real secrets. Hooks must be enabled; another plugin's behavior and filesystem
+access outside Claude's tools remain outside this boundary.
+
+Built-in Grep searches are checked against candidate filenames, not regex
+matches; broad searches can trip on protected files even when content would
+not match. This conservative scan includes ignored files and does not narrow
+by Grep's type filter. Negated and brace globs are rejected; use separate positive globs.
+
+## Recorded research results
+
+Source: our **5-agent research harness runs: 1 scripted compromised source +
+4 real Kimi agents**. The product-name charts describe the research engine,
+not this newly shipped Claude Code plugin.
+
+| Measure | Recorded result | Interpretation |
+|---|---|---|
+| Outbreaks stopped | **2 of 2** with containment vs **0 of 5** without containment | “Stopped” means the already-compromised source was contained; not demonstrated prevention of secondary spread. Five is a descriptive archive count: four complete no-defense/prompt-only recordings plus provider-failed seed103; not an eligible five-run study denominator. |
+| Poisoned agent loose | **5–9 seconds** vs **6–9 minutes** without containment | Rounded recorded source-freeze times, 5.435s and 9.259s; comparison agents were never contained, so minutes describe observed source-actor activity windows, not time to eventual containment. |
+| Healthy agents frozen | **0** in corrected-policy **replay of recorded runs** | Posthoc replay, not a new live result. Original live runs froze 6 healthy agents; no replacement turns were generated. |
+| Doctor overhead | **<½¢ per run** | Recorded defense API cost: $0.004654104 and $0.003587766. Excludes agent subscription usage and total campaign costs; not a Claude plugin cost estimate. |
+
+![Recorded source containment times](docs/img/chart-time.png)
+![Recorded containment counts](docs/img/chart-outbreaks.png)
+![Posthoc replay healthy-agent freezes](docs/img/chart-frozen.png)
+![Recorded research defense cost](docs/img/chart-cost.png)
+
+Evidence: [sealed pressure campaign](experiments/committed/pressure-campaign/),
+[posthoc replay receipt](experiments/committed/salvage-campaign/step-a.json),
+and [historical metrics](docs/generated/README-metrics.md). Both complete
+paired seeds 101/102 recorded **zero secondary infections in every arm**.
+All six held-out graders failed. These observations demonstrate source
+containment, not successful task completion or a measured reduction in spread.
+Incomplete provider failures remain excluded from scientific denominators.
+
+The “0 of 5” archive/chart count includes seeds 101/102 no-defense and
+prompt-only (four complete Kimi recordings) plus seed103 no-defense
+(provider-failed, excluded from the study). Restricting to complete paired
+comparisons gives **0 of 4**. It is not five independent matched baselines.
+
+## Capabilities: plugin vs research harness
+
+| Capability | Claude Code plugin today | Research harness only |
+|---|---|---|
+| Goal and file-scope lock | Local interview and JSON spec | Interviewed goal contracts |
+| Off-task edits | Deterministic path-based blocking and steer message | Semantic progress evaluation |
+| Secret/decoy and never-touch tripwires | PreToolUse deny/ask and actor quarantine | Verified violation escalation |
+| Parallel workers | Command prompts 3–4 subagents; optional headless launcher | Controlled five-actor recorded runs |
+| Cross-agent tracing | Timestamped observed write → later read; taint/watch heuristic | Directional evidence and reached-agent verification |
+| Release and report | Local commands, session counts and event log | Freeze scheduling and scientific metrics |
+| Model-backed checker/judge | No model calls; Python standard library | Recorded Kimi/OpenRouter responses and offline replay |
+| Live visual board | Coming soon | Existing historical research dashboard |
+| Validation | Offline real-script hook tests; live Claude lab **not run** | Recorded research runs; limitations documented below |
+
+## Roadmap
+
+`/swarm-doctor:board` — live visual board **coming soon**. Not a shipped command.
+
+## Claude Code format references
+
+Formats checked against official documentation before implementation:
+[plugin manifests](https://code.claude.com/docs/en/plugins/manifest-reference),
+[components and commands](https://code.claude.com/docs/en/plugins/components),
+[marketplaces](https://code.claude.com/docs/en/plugins/create-marketplace),
+[installation](https://code.claude.com/docs/en/plugins/install),
+[hooks guide](https://code.claude.com/docs/en/hooks-guide),
+[hook JSON](https://code.claude.com/docs/en/hooks), and
+[CLI flags](https://code.claude.com/docs/en/cli-reference).
+
+## Historical research engine (oh-my-pi)
+
+The original Below One engine is retained for research reproduction.
+The following instructions concern that engine, **not plugin installation**.
+
+### Quick start (oh-my-pi swarm)
+
+```bash
+# Historical research dependencies; unnecessary for the Claude Code plugin:
+git clone --branch feat/below-one https://github.com/jxdai2007/swarm-doctor.git
+cd swarm-doctor
 uv sync                                    # python engine + deps
 uv run python scripts/first_hour_checks.py # verify model endpoints + omp
 
