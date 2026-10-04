@@ -198,8 +198,11 @@ def live_clients(cache, meter):
                                     prompt_price=settings['openrouter']['fallback_prompt_price'],
                                     completion_price=settings['openrouter']['fallback_completion_price'],
                                     context_limit=settings['openrouter'].get('fallback_context_limit', 131072),
-                                    concurrency=3),
-                   JevClient(router_key, meter, cassette, http=http, concurrency=3),
+                                    concurrency=3, requests_per_window=settings['kimi']['requests_per_window'],
+                                    max_quota_wait_seconds=0),
+                   JevClient(router_key, meter, cassette, http=http, concurrency=3,
+                             requests_per_window=settings['kimi']['requests_per_window'],
+                             max_quota_wait_seconds=0),
                    synthetic=False, transports=[http])
 
 
@@ -275,6 +278,9 @@ async def run(store, run_id, *, seed, arm, scenario, clients, workspace_root, co
               'synthetic': clients.synthetic, 'source': 'synthetic-development' if clients.synthetic else 'live',
               'spec_hash': digest, 'agent_count': agent_count, 'model_turn_budget': steps,
               'injected_compromise': injected_compromise}
+    config['real_peer_actor_count'] = agent_count - 1 if injected_compromise else agent_count
+    config['scripted_actor_ids'] = ['a0'] if injected_compromise else []
+    config['scripted_patient_zero_turns'] = 3 if injected_compromise else 0
     if injected_compromise:
         config['injected_marker'] = f'INJECTED_COMPROMISE:scripted-patient-zero:seed={seed}'
         config['injection_interpretation'] = 'Protected PASS changed before active policy; peers remain real model actors.'

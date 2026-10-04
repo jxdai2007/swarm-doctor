@@ -1,0 +1,104 @@
+{
+  "status": "selected",
+  "rationale": "Explicit user replacement requirement excludes mistralai/mistral-nemo; selected cheapest remaining eligible paid tool-calling model with demonstrated tool call and tool-result continuation.",
+  "selection": {
+    "model": "inclusionai/ling-3.0-flash-vl",
+    "input_usd_per_million_tokens": 0.021,
+    "output_usd_per_million_tokens": 0.0616,
+    "blend_80_20_usd_per_million_tokens": 0.02912,
+    "context_length": 262144,
+    "top_provider": {
+      "context_length": 262144,
+      "max_completion_tokens": 32768,
+      "is_moderated": false
+    },
+    "requested_model": "inclusionai/ling-3.0-flash-vl",
+    "served_model": "inclusionai/ling-3.0-flash-vl",
+    "tool_call_valid": true,
+    "tool_result_continuation_valid": true
+  },
+  "catalog_url": "https://openrouter.ai/api/v1/models",
+  "catalog_retrieved_at": "2026-10-04T12:50:00.381593+00:00",
+  "catalog_sha256": "f1a9598bf105d9595bad8585804e3eb87352d3ee06205b2eb26ba237e2fcecf3",
+  "catalog_sha256_representation": "Original HTTP response body bytes from this retrieval",
+  "ranking_source_catalog_retrieved_at": "2026-10-04T12:37:51.623363+00:00",
+  "ranking_source_catalog_sha256": "fb600ff0f44b478121759e0eda07278cef93c4ee871a8dbf3b44d03090d4575e",
+  "ranking_source_hash_representation": "UTF-8 canonicalized parsed JSON: sorted keys, compact separators, ensure_ascii=False; not HTTP wire bytes",
+  "top_three_non_nemo_candidates": [
+    {
+      "model": "inclusionai/ling-3.0-flash-vl",
+      "input_usd_per_million_tokens": 0.021,
+      "output_usd_per_million_tokens": 0.0616,
+      "blend_80_20_usd_per_million_tokens": 0.02912
+    },
+    {
+      "model": "inclusionai/ling-3.0-flash",
+      "input_usd_per_million_tokens": 0.021,
+      "output_usd_per_million_tokens": 0.063,
+      "blend_80_20_usd_per_million_tokens": 0.0294
+    },
+    {
+      "model": "openai/gpt-oss-20b",
+      "input_usd_per_million_tokens": 0.018,
+      "output_usd_per_million_tokens": 0.09,
+      "blend_80_20_usd_per_million_tokens": 0.0324
+    }
+  ],
+  "selected_current_catalog_pricing_usd_per_token": {
+    "prompt": "0.000000021",
+    "completion": "0.0000000616"
+  },
+  "price_mix": {
+    "input": 0.8,
+    "output": 0.2
+  },
+  "probe_endpoint": "https://openrouter.ai/api/v1/chat/completions",
+  "probe_records": [{"candidate": "inclusionai/ling-3.0-flash-vl", "attempt": 1, "stage": "tool_call", "http_status": 200, "requested_model": "inclusionai/ling-3.0-flash-vl", "served_model": "inclusionai/ling-3.0-flash-vl", "provider": "Novita", "request_body": {"model": "inclusionai/ling-3.0-flash-vl", "messages": [{"role": "user", "content": "Call record_probe once with marker=\"below-one-replacement\" and value=7. Do not answer in text."}], "tools": [{"type": "function", "function": {"name": "record_probe", "description": "Record a harmless tool-call capability probe.", "parameters": {"type": "object", "properties": {"marker": {"type": "string"}, "value": {"type": "integer"}}, "required": ["marker", "value"], "additionalProperties": false}}}], "tool_choice": {"type": "function", "function": {"name": "record_probe"}}, "max_tokens": 128, "temperature": 0, "provider": {"require_parameters": true, "allow_fallbacks": false}, "usage": {"include": true}, "reasoning": {"enabled": false}}, "response_body": {"id": "gen-1791118200-Tk681MzXbwidOPeP2gx4", "provider": "Novita", "model": "inclusionai/ling-3.0-flash-vl", "object": "chat.completion", "created": 1791118200, "choices": [{"index": 0, "logprobs": null, "finish_reason": "tool_calls", "native_finish_reason": "tool_calls", "message": {"role": "assistant", "content": "\n", "refusal": null, "reasoning": null, "tool_calls": [{"type": "function", "index": 0, "id": "call_ec9969eb8ec04a64b310548d", "function": {"name": "record_probe", "arguments": "{\"marker\": \"below-one-replacement\", \"value\": 7}"}}]}}], "usage": {"prompt_tokens": 280, "completion_tokens": 46, "total_tokens": 326, "cost": 8.7136e-06, "is_byok": false, "prompt_tokens_details": {"cached_tokens": 0, "cache_write_tokens": 0, "audio_tokens": 0, "video_tokens": 0}, "cost_details": {"upstream_inference_cost": 8.7136e-06, "upstream_inference_prompt_cost": 5.88e-06, "upstream_inference_completions_cost": 2.8336e-06}, "completion_tokens_details": {"reasoning_tokens": 0, "image_tokens": 0, "audio_tokens": 0}}}, "tool_call_valid": true, "parsed_tool_arguments": {"marker": "below-one-replacement", "value": 7}, "continuation_valid": null, "completed_at": "2026-10-04T12:50:01.255583+00:00"}, {"candidate": "inclusionai/ling-3.0-flash-vl", "attempt": 2, "stage": "tool_result_continuation", "http_status": 200, "requested_model": "inclusionai/ling-3.0-flash-vl", "served_model": "inclusionai/ling-3.0-flash-vl", "provider": "Novita", "request_body": {"model": "inclusionai/ling-3.0-flash-vl", "messages": [{"role": "user", "content": "Call record_probe once with marker=\"below-one-replacement\" and value=7. Do not answer in text."}, {"role": "assistant", "content": "\n", "refusal": null, "reasoning": null, "tool_calls": [{"type": "function", "index": 0, "id": "call_ec9969eb8ec04a64b310548d", "function": {"name": "record_probe", "arguments": "{\"marker\": \"below-one-replacement\", \"value\": 7}"}}]}, {"role": "tool", "tool_call_id": "call_ec9969eb8ec04a64b310548d", "content": "{\"recorded\":true,\"marker\":\"below-one-replacement\",\"value\":7}"}, {"role": "user", "content": "Confirm the recorded marker and value in one short sentence."}], "tools": [{"type": "function", "function": {"name": "record_probe", "description": "Record a harmless tool-call capability probe.", "parameters": {"type": "object", "properties": {"marker": {"type": "string"}, "value": {"type": "integer"}}, "required": ["marker", "value"], "additionalProperties": false}}}], "tool_choice": "none", "max_tokens": 64, "temperature": 0, "provider": {"require_parameters": true, "allow_fallbacks": false}, "usage": {"include": true}, "reasoning": {"enabled": false}}, "response_body": {"id": "gen-1791118201-uNcBeMHySDaqMVhipVem", "provider": "Novita", "model": "inclusionai/ling-3.0-flash-vl", "object": "chat.completion", "created": 1791118201, "choices": [{"index": 0, "logprobs": null, "finish_reason": "stop", "native_finish_reason": "stop", "message": {"role": "assistant", "content": "The recorded marker is \"below-one-replacement\" with a value of 7.", "refusal": null, "reasoning": null}}], "usage": {"prompt_tokens": 123, "completion_tokens": 18, "total_tokens": 141, "cost": 3.6918e-06, "is_byok": false, "prompt_tokens_details": {"cached_tokens": 0, "cache_write_tokens": 0, "audio_tokens": 0, "video_tokens": 0}, "cost_details": {"upstream_inference_cost": 3.6918e-06, "upstream_inference_prompt_cost": 2.583e-06, "upstream_inference_completions_cost": 1.1088e-06}, "completion_tokens_details": {"reasoning_tokens": 0, "image_tokens": 0, "audio_tokens": 0}}}, "tool_call_valid": null, "parsed_tool_arguments": null, "continuation_valid": true, "completed_at": "2026-10-04T12:50:01.887454+00:00"}],
+  "reported_total_probe_cost_usd": 1.2405400000000002e-05,
+  "provider_actual_price": {
+    "input_usd_per_million_tokens": 0.021,
+    "output_usd_per_million_tokens": 0.0616,
+    "basis": "Response cost_details divided by prompt/completion token counts; matches documented model catalog rates for both calls."
+  },
+  "key_usage_before": {
+    "retrieved_at": "2026-10-04T12:49:21.075936+00:00",
+    "http_status": 200,
+    "limit": 15,
+    "limit_remaining": 14.98083971,
+    "limit_reset": null,
+    "usage": 0.01916029,
+    "usage_daily": 0.01916029,
+    "usage_weekly": 0.01916029,
+    "usage_monthly": 0.01916029,
+    "is_free_tier": false
+  },
+  "key_usage_after": {
+    "retrieved_at": "2026-10-04T12:50:01.929325+00:00",
+    "http_status": 200,
+    "limit": 15,
+    "limit_remaining": 14.98083971,
+    "limit_reset": null,
+    "usage": 0.01916029,
+    "usage_daily": 0.01916029,
+    "usage_weekly": 0.01916029,
+    "usage_monthly": 0.01916029,
+    "is_free_tier": false
+  },
+  "cap_unchanged": true,
+  "cap_mutation_requests": 0,
+  "key_usage_delta_usd": 0.0,
+  "accounting_note": "Immediate key usage delta is zero despite nonzero reported inference costs; eventual key accounting may lag.",
+  "limits": {
+    "max_candidates": 3,
+    "max_total_calls_per_candidate": 2,
+    "actual_candidates": 1,
+    "actual_calls": 2
+  },
+  "excluded_probe_routes": [
+    "Nemo",
+    "Kimi",
+    "Jev",
+    "native"
+  ],
+  "saved_at": "2026-10-04T12:50:30.481108+00:00"
+}

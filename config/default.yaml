@@ -30,10 +30,11 @@ kimi:
   - 4
 openrouter:
   base_url: https://openrouter.ai/api/v1
-  fallback_model: mistralai/mistral-nemo
-  fallback_canonical_slug: mistralai/mistral-nemo
-  fallback_prompt_price: '0.000000019'
-  fallback_completion_price: '0.00000003'
+  fallback_model: inclusionai/ling-3.0-flash-vl
+  fallback_canonical_slug: inclusionai/ling-3.0-flash-vl
+  fallback_prompt_price: '0.000000021'
+  fallback_completion_price: '0.0000000616'
+  fallback_context_limit: 262144
 jev:
   model: typesafe/jev-1.13
   timeout_seconds: 10.0
