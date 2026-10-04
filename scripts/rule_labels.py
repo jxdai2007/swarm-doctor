@@ -141,9 +141,26 @@ def main(argv=None) -> int:
                         default=str(ROOT / "experiments/committed/live-runs"))
     parser.add_argument("--out",
                         default=str(ROOT / "labels/monitor_labels-RULE-DERIVED.jsonl"))
+    parser.add_argument("--all", action="store_true",
+                        help="label every deduped action in --runs (distinct "
+                             "IDs), not just the frozen sample rows")
     args = parser.parse_args(argv)
     sha = manifest_sha()
-    rows = [json.loads(l) for l in Path(args.sample).open() if l.strip()]
+    if args.all:
+        rows = []
+        for run_dir in sorted(Path(args.runs_root).iterdir()):
+            config = run_dir / "config.json"
+            if run_dir.name.startswith(".") or not config.is_file():
+                continue
+            if (run_dir / "incomplete.json").exists() or not (
+                    run_dir.parent / ".seals" / f"{run_dir.name}.sha256").exists():
+                continue  # only complete sealed runs are label-eligible
+            for action_id in load_actions(run_dir.parent, run_dir.name):
+                event_id = action_id if action_id.startswith(
+                    run_dir.name + ":") else f"{run_dir.name}:{action_id}"
+                rows.append({"event_id": event_id, "action_id": action_id})
+    else:
+        rows = [json.loads(l) for l in Path(args.sample).open() if l.strip()]
     cache: dict[str, tuple[dict, dict, dict]] = {}
     out, counts, missing = [], {}, []
     for row in rows:
