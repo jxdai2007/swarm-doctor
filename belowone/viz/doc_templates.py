@@ -88,6 +88,9 @@ _HYP_FIELD_DEFAULTS = (("status", _UNMEASURED_DEFAULT),
                        ("summary", "not yet measured"))
 _HYP_DEFAULTS = {hid: dict(_HYP_FIELD_DEFAULTS) for hid in _HYPOTHESES}
 _HYP_DEFAULTS["h6"]["status"] = _UNMEASURED_H6
+_HYP_DEFAULTS["h6"]["label_provenance"] = (
+    "RULE-DERIVED from scenario-manifest ground-truth rules (KTD4); "
+    "R31 deviation: no human labels available")
 
 
 def hypothesis_tokens(metrics: dict) -> dict:
@@ -98,6 +101,10 @@ def hypothesis_tokens(metrics: dict) -> dict:
         for field, default in _HYP_FIELD_DEFAULTS:
             key = f"hypotheses.{hid}.{field}"
             out[key] = metrics.get(key, _HYP_DEFAULTS[hid][field])
+        if hid == "h6":
+            out["hypotheses.h6.label_provenance"] = metrics.get(
+                "hypotheses.h6.label_provenance",
+                _HYP_DEFAULTS["h6"]["label_provenance"])
     return out
 
 
@@ -488,7 +495,7 @@ eligible comparisons, never a target.
 | H3 | Strict mode preserves more work than kill-all | {hypotheses.h3.status} (N={hypotheses.h3.n}; source: {hypotheses.h3.source}; mode: {hypotheses.h3.mode}) — {hypotheses.h3.summary} |
 | H4 | The interview cuts false alarms | {hypotheses.h4.status} (N={hypotheses.h4.n}; source: {hypotheses.h4.source}; mode: {hypotheses.h4.mode}) — {hypotheses.h4.summary} |
 | H5 | Prevention lowers R | {hypotheses.h5.status} (N={hypotheses.h5.n}; source: {hypotheses.h5.source}; mode: {hypotheses.h5.mode}) — {hypotheses.h5.summary} |
-| H6 | Fast-checker confidence is/is not calibrated enough to set the radius | {hypotheses.h6.status} (N={hypotheses.h6.n}; source: {hypotheses.h6.source}; mode: {hypotheses.h6.mode}) — {hypotheses.h6.summary} |
+| H6 | Fast-checker confidence is/is not calibrated enough to set the radius | {hypotheses.h6.status} (N={hypotheses.h6.n}; source: {hypotheses.h6.source}; mode: {hypotheses.h6.mode}) — {hypotheses.h6.summary} Label provenance: {hypotheses.h6.label_provenance}. |
 | H7 | Below One cuts wasted spend versus prompt-only with few false steers | {hypotheses.h7.status} (N={hypotheses.h7.n}; source: {hypotheses.h7.source}; mode: {hypotheses.h7.mode}) — {hypotheses.h7.summary} |
 
 ## Replay versus live

@@ -1,0 +1,152 @@
+{
+ "comparison": {
+  "jev_accuracy": 0.75,
+  "jev_cost_usd": 0.003199098,
+  "jev_latency_median_s": 0.1641477500088513,
+  "judge_accuracy": 0.75,
+  "judge_cost_usd": 0.0,
+  "judge_latency_median_s": 4.578292125137523,
+  "n_both": 40
+ },
+ "jev": {
+  "accuracy": 0.6363636363636364,
+  "calibration_error": 0.22727272727272732,
+  "confusion": {
+   "clean": {
+    "clean": 49,
+    "drift": 26,
+    "violation": 1
+   },
+   "drift": {
+    "clean": 0,
+    "drift": 0,
+    "violation": 0
+   },
+   "violation": {
+    "clean": 1,
+    "drift": 0,
+    "violation": 0
+   }
+  },
+  "cost_per_1000_checks_usd": 0.08516890909090909,
+  "latency_median_s": 0.16485891724005342,
+  "latency_p95_s": 0.34749412536621094,
+  "n_scored": 77,
+  "proposed_band": {
+   "band": [
+    0.7,
+    0.9
+   ],
+   "basis": "11 samples in bin [0.75, 0.9] with accuracy 0.45",
+   "exploratory": true,
+   "min_samples": 5
+  },
+  "reliability_bins": [
+   {
+    "accuracy": 0.72,
+    "bin": [
+     0.0,
+     0.5
+    ],
+    "error": 0.41719999999999996,
+    "mean_confidence": 0.3028,
+    "n": 25
+   },
+   {
+    "accuracy": 0.6578947368421053,
+    "bin": [
+     0.5,
+     0.75
+    ],
+    "error": 0.04210526315789487,
+    "mean_confidence": 0.6157894736842104,
+    "n": 38
+   },
+   {
+    "accuracy": 0.45454545454545453,
+    "bin": [
+     0.75,
+     0.9
+    ],
+    "error": 0.34,
+    "mean_confidence": 0.7945454545454546,
+    "n": 11
+   },
+   {
+    "accuracy": 0.3333333333333333,
+    "bin": [
+     0.9,
+     1.0
+    ],
+    "error": 0.5766666666666667,
+    "mean_confidence": 0.91,
+    "n": 3
+   }
+  ]
+ },
+ "judge": {
+  "accuracy": 0.75,
+  "calibration_error": 0.14875000000000002,
+  "confusion": {
+   "clean": {
+    "clean": 30,
+    "drift": 10,
+    "violation": 0
+   },
+   "drift": {
+    "clean": 0,
+    "drift": 0,
+    "violation": 0
+   },
+   "violation": {
+    "clean": 0,
+    "drift": 0,
+    "violation": 0
+   }
+  },
+  "cost_per_1000_checks_usd": 0.0,
+  "latency_median_s": 4.578292125137523,
+  "latency_p95_s": 9.219800624996424,
+  "n_scored": 40,
+  "proposed_band": null,
+  "reliability_bins": [
+   {
+    "accuracy": 0.0,
+    "bin": [
+     0.5,
+     0.75
+    ],
+    "error": 0.6866666666666666,
+    "mean_confidence": 0.6866666666666666,
+    "n": 3
+   },
+   {
+    "accuracy": 0.75,
+    "bin": [
+     0.75,
+     0.9
+    ],
+    "error": 0.06874999999999998,
+    "mean_confidence": 0.81875,
+    "n": 8
+   },
+   {
+    "accuracy": 0.8275862068965517,
+    "bin": [
+     0.9,
+     1.0
+    ],
+    "error": 0.1151724137931035,
+    "mean_confidence": 0.9427586206896552,
+    "n": 29
+   }
+  ]
+ },
+ "provenance": {
+  "live": true,
+  "method": "rule-derived",
+  "note": "labels derived from scenario-manifest ground-truth rules (KTD4), not human; R31 deviation recorded",
+  "source": "recording"
+ },
+ "synthetic": false
+}
