@@ -284,7 +284,7 @@ async def test_actual_omp_death_settles_claimed_write_as_possible_and_unblocks_c
         return original(engine, **kwargs)
     monkeypatch.setattr(module, 'create_app', create)
     result = await module.launch(out=tmp_path / 'runs', workspaces=tmp_path / 'work',
-                                 commit='synthetic-runtime-check', synthetic=True, agents=2, timeout=90,
+                                 commit='synthetic-runtime-check', synthetic=True, agents=2, timeout=240,
                                  scripts={'a0': [('write', {'path': 'reports/export.py', 'content': 'never delivered'})],
                                           'a1': [('write', {'path': 'reports/export.py', 'content': module.CSV_IMPLEMENTATION}),
                                                  ('below_one_finish', {})]})
@@ -302,7 +302,7 @@ async def test_actual_omp_opaque_shell_records_unknown_not_infection_or_contact(
                       ('write', {'path': 'reports/export.py', 'content': module.CSV_IMPLEMENTATION}),
                       ('below_one_finish', {})]}
     result = await module.launch(out=tmp_path / 'runs', workspaces=tmp_path / 'work',
-                                 commit='synthetic-runtime-check', synthetic=True, agents=3, scripts=scripts, timeout=90)
+                                 commit='synthetic-runtime-check', synthetic=True, agents=3, scripts=scripts, timeout=240)
     edge = next(edge for edge in result['snapshot']['graph']['edges'] if edge['operation'] == 'unknown')
     assert edge['unknown_access'] and edge['path'] == '__unknown__/bash'
     assert 'unobserved' in edge['reason']

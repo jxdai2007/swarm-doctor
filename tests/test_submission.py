@@ -24,6 +24,10 @@ ROOT = Path(__file__).resolve().parent.parent
 @pytest.fixture
 def submission(tmp_path):
     source = ROOT / "experiments/derived/analysis.json"
+    if not source.exists():
+        # Fresh clone: derived/ is a gitignored build output; rebuild it from the
+        # sealed archives exactly as `make regenerate` does (keyless, offline).
+        experiments.regenerate(ROOT / "experiments/committed/runs", ROOT / "experiments/derived")
     metrics = load_metrics([source])
     build_authored(metrics, tmp_path)
     build_docs(metrics, tmp_path / "docs/generated")
