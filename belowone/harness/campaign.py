@@ -8,13 +8,33 @@ import signal
 
 from belowone.events import artifact_bytes
 from belowone.harness.launcher import live_clients, run
-from belowone.meter import Meter
+from belowone.meter import BudgetExceeded, Meter
+from belowone.models.kimi import QuotaPending, RateLimitExceeded
 from belowone.runstore import RunStore
+
+
+def credit_stopped(report):
+    from decimal import Decimal
+    reason = report.get('stop_reason')
+    return (report['budget_breached'] or
+            Decimal(report['spent_usd']) + Decimal(report['reserved_usd']) >= Decimal(report['cap_usd']) or
+            bool(reason and not reason.startswith('Kimi provider quota exhausted')))
+
+
+def overflow_backend(backend, failure, meter):
+    """A failed whole Kimi set may restart on OR; never erase a credit stop."""
+    if backend == 'kimi' and isinstance(failure, (QuotaPending, RateLimitExceeded)) and not credit_stopped(meter.report()):
+        return 'openrouter'
+    return None
 
 
 async def campaign(args):
     root = Path(args.out).resolve()
     store = RunStore(root)
+    audit_path = root / 'campaign-audit.json'
+    prior = json.loads(audit_path.read_text()) if audit_path.is_file() else {}
+    if prior.get('meter') and credit_stopped(prior['meter']):
+        raise BudgetExceeded(prior['meter'].get('stop_reason') or 'Prior campaign spend cap reached')
     clients = live_clients(root / '_cache', Meter(cap_usd='15'))
     if args.backend == 'openrouter':
         clients.router._quota_exhausted = True
@@ -25,8 +45,7 @@ async def campaign(args):
     deadline = datetime.fromisoformat(args.deadline).timestamp()
     loop.call_later(max(0, deadline - datetime.now().timestamp()), stop.set)
     active_engine = None
-    audit_path = root / 'campaign-audit.json'
-    receipts = json.loads(audit_path.read_text())['runs'] if audit_path.is_file() else []
+    receipts = prior.get('runs', [])
 
     async def ready(engine):
         nonlocal active_engine
@@ -45,6 +64,7 @@ async def campaign(args):
         deadline_task = asyncio.create_task(stop.wait())
         result = None
         error = None
+        failure = None
         try:
             done, _ = await asyncio.wait((task, deadline_task), return_when=asyncio.FIRST_COMPLETED)
             if deadline_task in done and not task.done():
@@ -57,6 +77,7 @@ async def campaign(args):
             result = await task
         except BaseException as exc:
             error = 'Owned campaign deadline/interruption' if isinstance(exc, asyncio.CancelledError) else str(exc)
+            failure = exc
             folder = root / name
             if active_engine is not None:
                 for agent, state in active_engine.snapshot()['states'].items():
@@ -76,7 +97,8 @@ async def campaign(args):
         # Independent audit: a normal seal is insufficient under known terminal swallowing.
         complete = result is not None and not clients.meter.stop_reason
         audit = {'run': name, 'complete': complete, 'error': error or clients.meter.stop_reason,
-                 'injected_compromise': injected, 'backend_pin': args.backend}
+                 'injected_compromise': injected, 'backend_pin': args.backend,
+                 'error_class': type(failure).__name__ if failure else None}
         if folder.is_dir() and (folder / 'manifest.json').is_file():
             import hashlib
             audit['seal_sha256'] = hashlib.sha256((root / '.seals' / f'{name}.sha256').read_bytes()).hexdigest()
@@ -96,11 +118,18 @@ async def campaign(args):
                 response = json.loads(path.read_text())['response']
                 if response.get('_belowone_error'):
                     failures.append({'cassette': path.name, 'kind': response['_belowone_error'],
-                                     'reason': response.get('reason')})
+                                     'reason': response.get('reason'),
+                                     'provider': response.get('_belowone_attempts', [{}])[0].get('provider')})
             audit['recorded_model_failures'] = failures
             if any(row['kind'] in {'quota_pending', 'rate_limit'} for row in failures):
                 audit['complete'] = False
                 audit['error'] = audit['error'] or 'Recorded provider quota/rate-limit failure; paired arm excluded'
+                terminal = next((row for row in failures if row['provider'] == 'kimi' and
+                                 row['kind'] in {'quota_pending', 'rate_limit'}), None)
+                if terminal and failure is None:
+                    failure = (QuotaPending if terminal['kind'] == 'quota_pending' else RateLimitExceeded)(terminal['reason'])
+                    audit['error_class'] = type(failure).__name__
+        audit['overflow_backend'] = overflow_backend(args.backend, failure, clients.meter)
         receipts.append(audit)
         (root / 'campaign-audit.json').write_bytes(artifact_bytes({'runs': receipts, 'meter': clients.meter.report()}))
         print(json.dumps(audit, sort_keys=True), flush=True)

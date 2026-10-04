@@ -386,3 +386,57 @@ async def test_openrouter_402_halts_judge_without_another_request(tmp_path):
     assert sent == ['openrouter.ai']
     assert meter.report()['reserved_usd'] == '0'
 
+
+
+async def test_campaign_nonquota_429_stops_triplet_then_starts_new_or_seed_without_clearing_credit(tmp_path):
+    from belowone.harness.campaign import overflow_backend
+    from belowone.models.kimi import QuotaPending, RateLimitExceeded
+    calls = []
+    credit_exhausted = False
+    def transport(request):
+        body = json.loads(request.content)
+        calls.append(body['model'])
+        if body['model'] == 'kimi-for-coding':
+            return httpx.Response(429, json={'error': 'rate limit; try later'})
+        if credit_exhausted:
+            return httpx.Response(402, json={'error': 'credit exhausted'})
+        return httpx.Response(200, json={'model': 'inclusionai/ling-3.0-flash-vl',
+            'choices': [{'message': {'content': 'contract smoke'}}],
+            'usage': {'prompt_tokens': 2, 'completion_tokens': 1, 'cost': 0.000001}})
+    meter = Meter('15')
+    async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as http:
+        kimi = KimiClient('contract-fixture', meter, Cassette(tmp_path / 'kimi'),
+                          retry_delays=[0], max_quota_wait_seconds=0, http=http)
+        fallback = OpenRouterClient('contract-fixture', meter, Cassette(tmp_path / 'or'),
+                                    model='inclusionai/ling-3.0-flash-vl', http=http)
+        router = ModelRouter(kimi, fallback)
+        attempted_arms = []
+        failure = None
+        for arm in ('no-defense', 'prompt-only', 'verify'):
+            attempted_arms.append(arm)
+            router.begin_run('failed-' + arm, seed=101)
+            try:
+                await router.current.chat([{'role': 'user', 'content': 'contract smoke'}])
+            except RateLimitExceeded as exc:
+                failure = exc
+                break
+            finally:
+                router.end_run()
+        assert attempted_arms == ['no-defense']
+        assert overflow_backend('kimi', failure, meter) == 'openrouter'
+        assert overflow_backend('kimi', QuotaPending('observed quota'), meter) == 'openrouter'
+        router._quota_exhausted = True
+        assert router.begin_run('fresh-no-defense', seed=201) is fallback
+        await router.current.chat([{'role': 'user', 'content': 'fresh whole triplet'}])
+        router.end_run()
+        assert calls == ['kimi-for-coding', 'kimi-for-coding', 'inclusionai/ling-3.0-flash-vl']
+        credit_exhausted = True
+        with pytest.raises(BudgetExceeded, match='HTTP 402'):
+            await fallback.chat([{'role': 'user', 'content': 'credit-stop smoke'}])
+        original = meter.stop_reason
+        assert overflow_backend('kimi', failure, meter) is None
+        assert meter.stop_reason == original
+        assert meter.report()['cap_usd'] == '15'
+        with pytest.raises(QuotaPending, match='credit exhausted'):
+            router.begin_run('refused', seed=202)
+        assert len(calls) == 4
