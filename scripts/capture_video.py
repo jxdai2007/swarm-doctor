@@ -78,10 +78,12 @@ def _derived_synthetic(group: str = "pilot-0") -> bool:
         return True
 
 
-def build_pages(pages: Path) -> tuple[dict[str, str], bool]:
+def build_pages(pages: Path, archive_run: str = "pilot-0",
+                archive_root: str = "experiments/committed/live-runs",
+                archived_runs_note: str = "pilot-0/pilot-1") -> tuple[dict[str, str], bool]:
     pages.mkdir(parents=True, exist_ok=True)
     live_group_badge = ("LIVE RECORDING — real measured run"
-                        if not _derived_synthetic() else DEV_BADGE)
+                        if not _derived_synthetic(archive_run) else DEV_BADGE)
 
     def write(name: str, text: str) -> str:
         path = pages / f"{name}.html"
@@ -93,10 +95,10 @@ def build_pages(pages: Path) -> tuple[dict[str, str], bool]:
     # Recorded setup spec from the real pilot archive: actual locked goal
     # spec walked through verbatim — NO synthetic task/CLI inputs. A live
     # interview was not measured; the page says so.
-    pilot = ROOT / "experiments" / "committed" / "live-runs" / "pilot-0"
+    pilot = ROOT / archive_root / archive_run
     spec_doc = json.loads((pilot / "spec-interviewed.json").read_text())
     one_line = json.loads((pilot / "spec-one-line.json").read_text())
-    spec_body = ("<pre>Recorded setup — pilot-0 recorded goal-spec envelopes\n"
+    spec_body = (f"<pre>Recorded setup — {archive_run} recorded goal-spec envelopes\n"
                  "spec-interviewed.json spec_hash: "
                  + html.escape(spec_doc.get("spec_hash", ""))
                  + "\nspec-one-line.json spec_hash: "
@@ -110,7 +112,7 @@ def build_pages(pages: Path) -> tuple[dict[str, str], bool]:
                  + "</pre>")
     urls["scripted-interview"] = write(
         "interview.html",
-        page("Recorded setup spec — pilot-0 (locked goal)",
+        page(f"Recorded setup spec — {archive_run} (locked goal)",
              spec_body,
              badge="REAL DATA — recorded setup spec; live interview not "
                    "measured"))
@@ -125,16 +127,16 @@ def build_pages(pages: Path) -> tuple[dict[str, str], bool]:
     urls["reproduce-proof"] = write(
         "repro.html",
         terminal("$ make reproduce  [offline byte comparison over "
-                 "experiments/committed/live-runs, exit 0]\n"
+                 f"{archive_root}, exit 0]\n"
                  + (repro.stdout + repro.stderr).strip(),
                  badge="REAL DATA / OFFLINE REPRODUCTION — sealed real "
-                       "pilot-0/pilot-1 archives"))
+                       f"{archived_runs_note} archives"))
 
     # Source-bound receipt published by regeneration and checked above.
-    receipt_path = ROOT / "experiments/derived/receipts/pilot-0/no-defense.txt"
+    receipt_path = ROOT / "experiments/derived/receipts" / archive_run / "no-defense.txt"
     receipt_text = receipt_path.read_text()
     urls["receipt"] = write(
-        "receipt.html", page("Outbreak receipt — pilot-0, no-defense",
+        "receipt.html", page(f"Outbreak receipt — {archive_run}, no-defense",
                              "<pre>" + html.escape(receipt_text) + "</pre>",
                              badge=live_group_badge))
 
@@ -149,7 +151,7 @@ def build_pages(pages: Path) -> tuple[dict[str, str], bool]:
     urls["charts"] = write("charts.html", page("Doc figures — counterfactual "
                                                "replay of real pilot recordings "
                                                "(cached-policy arms over sealed "
-                                               "pilot-0/pilot-1)", body,
+                                               f"{archived_runs_note})", body,
                                                badge=live_group_badge))
 
     analysis = json.loads((ROOT / "experiments/derived/analysis.json").read_text())
@@ -309,7 +311,9 @@ def _clip_name(base_name: str, source: dict) -> str:
 
 def storyboard(base: str, urls: dict[str, str],
                sources: dict | None = None,
-               live_group_real: bool = False) -> list[tuple]:
+               live_group_real: bool = False,
+               archive_run: str = "pilot-0",
+               archived_runs_note: str = "pilot-0/pilot-1") -> list[tuple]:
     """Beat sources come from clips/sources.json when present (real run IDs,
     synthetic flags, allow_absent for truthful no-event beats); defaults are
     the committed synthetic-dev captures."""
@@ -335,11 +339,11 @@ def storyboard(base: str, urls: dict[str, str],
                          "steer", merged["steer"])
     static_sources = {
         "scripted-interview": {"synthetic": False, "mode": "recorded-setup-spec",
-                               "run": "pilot-0",
+                               "run": archive_run,
                                "kind_label": "recorded-setup",
-                               "note": "actual locked pilot-0 spec walkthrough; live interview not measured"},
+                               "note": f"actual locked {archive_run} spec walkthrough; live interview not measured"},
         "reproduce-proof": {"synthetic": False, "mode": "offline-reproduction",
-                            "runs": ["pilot-0", "pilot-1"],
+                            "runs": archived_runs_note.replace(" ", "").split("/"),
                             "kind_label": "offline-reproduction",
                             "note": "REAL DATA / OFFLINE REPRODUCTION over sealed real archives"},
         "threat": {"synthetic": False, "mode": "documentation",
@@ -372,6 +376,14 @@ def main(argv=None) -> int:
                         help="JSON file mapping board/catch/freeze/steer "
                              "beats to run IDs with synthetic flags and "
                              "allow_absent for real no-event beats")
+    parser.add_argument("--archive-run", default="pilot-0",
+                        help="archived run whose spec/receipt back the "
+                             "setup/receipt beats")
+    parser.add_argument("--archive-root",
+                        default="experiments/committed/live-runs",
+                        help="archive root holding --archive-run")
+    parser.add_argument("--archived-runs-note", default="pilot-0/pilot-1",
+                        help="runs cited in reproduction/figure captions")
     args = parser.parse_args(argv)
     sources = None
     if args.sources:
@@ -391,9 +403,12 @@ def main(argv=None) -> int:
     try:
         with tempfile.TemporaryDirectory(prefix=".capture-", dir=out) as temporary:
             stage = Path(temporary)
-            urls, live_group_real = build_pages(stage / "pages")
+            urls, live_group_real = build_pages(
+                stage / "pages", args.archive_run, args.archive_root,
+                args.archived_runs_note)
             for name, url, seconds, kind, source in storyboard(
-                    args.base, urls, sources, live_group_real):
+                    args.base, urls, sources, live_group_real,
+                    args.archive_run, args.archived_runs_note):
                 try:
                     clip = capture_one(name, url, seconds, kind, stage, args.base, source)
                     if clip.parent != stage or not clip.is_file() or clip.stat().st_size == 0:
