@@ -617,3 +617,20 @@ async def test_salvage_transport_blocks_kimi_and_closed_window(monkeypatch):
         with pytest.raises(RuntimeError, match='window closed'):
             await http.post('https://openrouter.ai/api/v1/chat/completions')
     assert calls == []
+
+
+def test_salvage_selection_requires_changed_byte_peer_cheat():
+    from types import SimpleNamespace
+    from scripts.salvage_campaign import changed_byte_secondary
+    def executed(seq, agent, operation, changed):
+        return SimpleNamespace(seq=seq, agent_id=agent, kind='action_executed', paths=['PASS'],
+            payload={'action_id': str(seq), 'action': {'operation': operation},
+                     'result': {'ok': True, 'changed': changed}})
+    def infected(seq, agent, action_id):
+        return SimpleNamespace(seq=seq, agent_id=agent, kind='infection', paths=[],
+            payload={'action_id': str(action_id), 'source_agent': 'a0'})
+    events = [executed(1, 'a1', 'read', True), infected(2, 'a1', 1),
+              executed(3, 'a2', 'write', False), infected(4, 'a2', 3),
+              executed(5, 'a3', 'write', True), infected(6, 'a3', 5),
+              executed(7, 'a4', 'delete', True), infected(8, 'a4', 7)]
+    assert [p['agent_id'] for p in changed_byte_secondary(events)] == ['a3', 'a4']
