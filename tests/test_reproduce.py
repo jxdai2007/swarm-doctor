@@ -910,3 +910,64 @@ def test_mixed_development_and_live_metadata_never_promotes_global_science(seale
     assert analysis["mixed_provenance"] is True
     assert analysis["scientific_promotion_allowed"] is False
     assert {group["synthetic"] for group in analysis["groups"].values()} == {True, False}
+
+
+def test_hypotheses_do_not_promote_zero_dollars_outbreak_or_synthetic_as_drift_savings(sealed_runs):
+    # Metadata-only eligibility test; this does not assert live evidence.
+    row, *_ = experiments._load_run(sealed_runs / 'drift-demo')
+    row['config'].update(synthetic=False, agent_count=5)
+    row.update(role='baseline', provenance={'fixture_only': True})
+    for arm in ('prompt-only', 'verify'):
+        row['arms'][arm]['wasted_spend_usd'] = 0
+    outcomes = experiments._hypothesis_report({'fixture': row}, {'status': 'blocked'})
+    assert outcomes['h7']['status'] == 'inconclusive' and outcomes['h7']['n'] == 1
+    assert outcomes['h7']['mode'] == 'counterfactual-replay'
+    assert outcomes['h3']['status'] == outcomes['h6']['status'] == 'not_measured'
+    row['config']['scenario'] = 'outbreak'
+    assert experiments._hypothesis_report({'fixture': row}, {'status': 'blocked'})['h7']['n'] == 0
+    row['config']['synthetic'] = True
+    assert all(outcome['status'] == 'not_measured'
+               for outcome in experiments._hypothesis_report({'fixture': row}, {'status': 'blocked'}).values())
+
+
+@pytest.mark.asyncio
+async def test_cohort_roles_keep_pilot_and_validation_out_of_independent_baseline_denominator(tmp_path):
+    from belowone.harness.launcher import run, synthetic_clients
+    store = RunStore(tmp_path / 'runs')
+    clients = synthetic_clients(tmp_path / 'cache', Meter())
+    try:
+        for name, count, role in [('calibration', 3, 'pilot-calibration'),
+                                  ('baseline', 5, 'baseline'),
+                                  ('validation', 5, 'validation/paired')]:
+            await run(store, name, seed=0, arm='no-defense', scenario='outbreak', clients=clients,
+                      workspace_root=tmp_path / 'work', commit='synthetic-test',
+                      agent_count=count, cohort_role=role)
+        analysis = experiments.analyze_recordings(store.root)
+        assert len(analysis['groups']) == 3
+        assert {(group['role'], group['agent_count'], group['run_count'])
+                for group in analysis['groups'].values()} == {
+                    ('pilot-calibration', 3, 1), ('baseline', 5, 1), ('validation/paired', 5, 1)}
+        assert analysis['actual_live_groups'] == {}
+        await run(store, 'duplicate-baseline', seed=0, arm='no-defense', scenario='outbreak',
+                  clients=clients, workspace_root=tmp_path / 'work', commit='synthetic-test',
+                  agent_count=5, cohort_role='baseline')
+        with pytest.raises(ValueError, match='Duplicate independent seed'):
+            experiments.analyze_recordings(store.root)
+    finally:
+        await clients.aclose()
+
+
+@pytest.mark.asyncio
+async def test_paid_study_requires_complete_sealed_pilot_before_creating_run(tmp_path, monkeypatch):
+    monkeypatch.setenv('KIMI_API_KEY', 'fake-kimi')
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'fake-router')
+    args = SimpleNamespace(command='experiments', mode='live', runs=str(tmp_path / 'sources'),
+                           out=str(tmp_path / 'runs'), workspaces=str(tmp_path / 'work'), commit='test-only')
+    with pytest.raises(RuntimeError, match='complete pilot variant selection'):
+        await experiments._live_study(args)
+    assert not (tmp_path / 'runs').exists()
+    (tmp_path / 'sources').mkdir()
+    (tmp_path / 'sources/pilot-summary.json').write_text(json.dumps({'status': 'complete', 'runs': []}))
+    with pytest.raises(RuntimeError, match='complete three-seed pilot'):
+        await experiments._live_study(args)
+    assert not (tmp_path / 'runs').exists()

@@ -12,6 +12,8 @@ check-env:
 # Synthetic runs never count as scientific live evidence.
 PILOT_ROOT ?= /tmp/belowone-pilot
 KIMI_REQUESTS_USED ?= 0
+RUNS ?= $(if $(wildcard experiments/committed/live-runs/.seals),experiments/committed/live-runs,experiments/committed/runs)
+EXPERIMENT_ROOT ?= /tmp/belowone-experiments
 pilot: MODE = live
 pilot:
 	uv run --frozen python -m belowone.experiments pilot --mode $(MODE) \
@@ -24,8 +26,9 @@ pilot:
 experiments: MODE = live
 experiments:
 	uv run --frozen python -m belowone.experiments experiments --mode $(MODE) \
-	  --out /tmp/belowone-experiments/runs \
-	  --workspaces /tmp/belowone-experiments/workspaces \
+	  --runs $(RUNS) \
+	  --out $(EXPERIMENT_ROOT)/runs \
+	  --workspaces $(EXPERIMENT_ROOT)/workspaces \
 	  --kimi-requests-used $(KIMI_REQUESTS_USED) \
 	  --commit $$(git rev-parse HEAD)
 
@@ -38,14 +41,14 @@ MONITOR_CHECKS ?=
 # `make regenerate` (a pre-reproduce regenerate would mask edited artifacts).
 reproduce:
 	uv run --frozen python -m belowone.experiments reproduce \
-	  --runs experiments/committed/runs \
+	  --runs $(RUNS) \
 	  --outputs experiments/derived \
 	  $(if $(LABELS),--labels $(LABELS)) \
 	  $(if $(MONITOR_CHECKS),--monitor-checks $(MONITOR_CHECKS))
 
 regenerate:
 	uv run --frozen python -m belowone.experiments regenerate \
-	  --runs experiments/committed/runs \
+	  --runs $(RUNS) \
 	  --outputs experiments/derived \
 	  $(if $(LABELS),--labels $(LABELS)) \
 	  $(if $(MONITOR_CHECKS),--monitor-checks $(MONITOR_CHECKS))
@@ -53,6 +56,7 @@ regenerate:
 rerun: MODE = live
 rerun:
 	uv run --frozen python -m belowone.experiments rerun --mode $(MODE) \
+	  --runs $(RUNS) \
 	  --out /tmp/belowone-rerun/runs \
 	  --workspaces /tmp/belowone-rerun/workspaces \
 	  --kimi-requests-used $(KIMI_REQUESTS_USED) \

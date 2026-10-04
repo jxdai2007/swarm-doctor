@@ -229,7 +229,8 @@ async def shadow_caches(store, run_id, spec, snapshots, clients, clock):
 
 
 async def run(store, run_id, *, seed, arm, scenario, clients, workspace_root, commit,
-              prevention=False, agent_count=5, steps=20, budget_steps=None, engine_ready=None):
+              prevention=False, agent_count=5, steps=20, budget_steps=None, engine_ready=None,
+              cohort_role=None):
     if type(agent_count) is not int or not 1 <= agent_count <= 5 or type(steps) is not int or not 1 <= steps <= 20:
         raise ValueError('Swarm bounded to 1..5 agents, 1..20 model turns each')
     metadata = load_scenario(scenario)
@@ -246,6 +247,8 @@ async def run(store, run_id, *, seed, arm, scenario, clients, workspace_root, co
     config = {'seed': seed, 'arm': arm, 'scenario': scenario, 'prevention': prevention,
               'synthetic': clients.synthetic, 'source': 'synthetic-development' if clients.synthetic else 'live',
               'spec_hash': digest, 'agent_count': agent_count, 'model_turn_budget': steps}
+    if cohort_role is not None:
+        config['cohort_role'] = cohort_role
     folder = store.create(run_id, config, commit=commit)
     clients.cassette(folder / 'cache')
     model = clients.router.begin_run(run_id, seed=seed)
