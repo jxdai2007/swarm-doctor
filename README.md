@@ -12,6 +12,8 @@ The story scenes in the demo video are dramatized; every number shown comes from
 > git clone https://github.com/jxdai2007/swarm-doctor && cd swarm-doctor && python3 try.py
 > ```
 >
+> ![What python3 try.py prints: two bad agents quarantined, one steered back to task, the healthy one untouched](docs/img/try-demo.png)
+>
 > In Claude Code, add this marketplace, then install the plugin:
 >
 > ```text
