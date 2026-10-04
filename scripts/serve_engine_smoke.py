@@ -42,14 +42,15 @@ SPEC = {
 }
 
 
-def smoke_app(artifact_root: Path, display_root: Path, log_root: Path):
+def smoke_app(artifact_root: Path, display_root: Path, log_root: Path,
+              synthetic: bool = True):
     """Create the real same-engine app with launch-issued agent capabilities."""
     root = log_root
     spec = GoalSpec.from_dict(SPEC, workspace=ROOT)
     detector = Detector(spec, JevClient(None, Meter(),
                                         Cassette(root / "cache", "replay")))
     engine = Engine(spec, EventLog(root / "events.jsonl"), detector,
-                    agent_ids=["a0", "a1", "a2"], synthetic=True)
+                    agent_ids=["a0", "a1", "a2"], synthetic=synthetic)
     return create_app(
         engine, operator_token=secrets.token_urlsafe(32),
         agent_tokens={agent: secrets.token_urlsafe(32)
@@ -65,13 +66,18 @@ def main() -> int:
                         default=ROOT / "experiments" / "committed" / "runs")
     parser.add_argument("--display-root", type=Path,
                         default=ROOT / "experiments" / "display")
+    parser.add_argument("--real", action="store_true",
+                        help="Serve archived REAL recordings: engine "
+                             "snapshots report synthetic=false so capture "
+                             "validation accepts real-source beats")
     args = parser.parse_args()
     import uvicorn
     with tempfile.TemporaryDirectory(prefix="u7-engine-smoke-") as tmp:
         app = smoke_app(args.artifact_root.resolve(), args.display_root.resolve(),
-                        Path(tmp))
+                        Path(tmp), synthetic=not args.real)
         print(f"engine dashboard on http://127.0.0.1:{args.port}/ "
-              f"(SYNTHETIC; archive {args.artifact_root.resolve()}; "
+              f"({'REAL' if args.real else 'SYNTHETIC'}; "
+              f"archive {args.artifact_root.resolve()}; "
               f"display {args.display_root.resolve()})")
         uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
     return 0

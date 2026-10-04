@@ -5,7 +5,7 @@ Scope: implement every unit in the approved plan and preserve operator-only auth
 - [x] G1: dependency/environment checks report real outcomes separately from the fullsuite
   CHECK: make check-env
   EXPECT: FIRST_HOUR_REPORT_WRITTEN
-  EVIDENCE: FIRST_HOUR_REPORT_WRITTEN (2026-10-04 local run; real probes; missing keys degrade to operator-blocked without faking: KIMI identity/OPENROUTER miss reported FAIL-open operational, npi-mistral/omp extension/served-path PASS)
+  EVIDENCE: FIRST_HOUR_REPORT_WRITTEN (2026-10-04 local run; real probes; missing keys degrade to operator-blocked without faking: KIMI identity/OPENROUTER miss reported FAIL-open operational, npi-mistral/omp extension/served-path PASS). Overnight live run: Kimi + Jev endpoint calls PASS with keys present; four omp probes FAIL TimeoutExpired; the study used the experiment-harness fallback (script child exit 0 / report written is not a native-probe PASS; exact wrapper exit unknown).
 
 - [x] G2: every implementation unit scenario and integrated engine path passes
   CHECK: make test
@@ -23,9 +23,10 @@ Scope: implement every unit in the approved plan and preserve operator-only auth
   EVIDENCE: DOC_SOURCES_VERIFIED exit0 — original checkout and fresh clone (0.24s), after current regeneration (REGENERATED_ALL_OUTPUTS, 41 changes confined to admitted message-only + provenance)
 
 - [ ] G5: live experiments and operator labels support every reported hypothesis
-  EVIDENCE: pending; credentials and operator labels required, synthetic evidence excluded
+  EVIDENCE (2026-10-04 overnight, partial): real 3-agent pilot calibration recordings exist (pilot-0/1 complete primary, pilot-2 sealed partial; archived a1a2e0e, runtime 10b84a2); 85-event frozen sample published (sha ccb1ad5b…), ZERO operator labels; H1/H4 exploratory-pilot-replay inconclusive N=2, H2/H3/H5/H6/H7 not_measured, main cohort N=0. GATE STILL UNMET: no operator labels, no main-cohort confirmatory evidence. Synthetic evidence excluded throughout.
 
 - [ ] G6: submission video narration, public repository and operator submission complete
+  EVIDENCE (2026-10-04 overnight, partial): 11/11 REAL capture beats produced and parent-visual-accepted (invocation 3c5df18594214c26a5d0b2220f6a2a05; inventory sha 2306b67c…; ffprobe vp8 1440×900); docs/video-script.md links current REAL names with truthful narration. STILL UNMET: narration/assembly, public flip with feat/below-one default BEFORE submission, final submission.
   EVIDENCE: pending; operator-only actions
 
 - [x] G7: fresh-clone keyless tests and comparison-only reproduction pass on the settled canonical source

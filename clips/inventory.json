@@ -1,73 +1,188 @@
 {
-  "invocation": "c0fbc8c51aa341a2b5cfead6080b4d78",
-  "started": "2026-10-04T01:55:40.160159+00:00",
-  "synthetic": true,
+  "invocation": "3c5df18594214c26a5d0b2220f6a2a05",
+  "started": "2026-10-04T10:49:12.626040+00:00",
+  "sources": {
+    "board": {
+      "run": "pilot-0",
+      "synthetic": false,
+      "note": "LIVE RECORDING \u2014 real 3-agent pilot run (calibration cohort)",
+      "allow_absent": false
+    },
+    "catch": {
+      "run": "pilot-0",
+      "synthetic": false,
+      "note": "LIVE RECORDING \u2014 no defense catch observed; outbreak never developed (secondary infections 0)",
+      "allow_absent": true
+    },
+    "freeze": {
+      "run": "pilot-0",
+      "synthetic": false,
+      "note": "LIVE RECORDING \u2014 no freeze occurred; containment unmeasured (no observed infections)",
+      "allow_absent": true
+    },
+    "steer": {
+      "run": "pilot-1",
+      "synthetic": false,
+      "note": "LIVE RECORDING \u2014 steering untested; no drift scenario in this run, no steer events",
+      "allow_absent": true
+    },
+    "split": {
+      "synthetic": false,
+      "mode": "counterfactual-replay",
+      "kind_label": "exploratory-counterfactual",
+      "runs": [
+        "pilot-0",
+        "pilot-1"
+      ],
+      "note": "EXPLORATORY COUNTERFACTUAL PILOT COMPARISON (N=2, 3 agents); LIVE ARM COMPARISON NOT RUN; no observed infections, R and containment not measured"
+    },
+    "charts": {
+      "synthetic": false,
+      "mode": "counterfactual-replay",
+      "runs": [
+        "pilot-0",
+        "pilot-1"
+      ],
+      "note": "cached-policy counterfactual arms replayed over sealed real pilot-0/pilot-1 recordings"
+    },
+    "receipt": {
+      "synthetic": false,
+      "mode": "actual",
+      "run": "pilot-0",
+      "note": "recorded no-defense receipt; counterfactual=false"
+    }
+  },
+  "all_synthetic": false,
   "produced": [
     {
-      "beat": "intro-board-SYNTHETIC-DEV",
-      "file": "intro-board-SYNTHETIC-DEV.webm",
+      "beat": "intro-board-REAL",
+      "file": "intro-board-REAL.webm",
       "seconds": 10,
-      "bytes": 878463
+      "bytes": 1013713,
+      "source_real": true,
+      "mode": "actual",
+      "run": "pilot-0",
+      "runs": null,
+      "note": "LIVE RECORDING \u2014 real 3-agent pilot run (calibration cohort)"
     },
     {
-      "beat": "scripted-interview-SYNTHETIC-DEV",
-      "file": "scripted-interview-SYNTHETIC-DEV.webm",
+      "beat": "scripted-interview-REAL-recorded-setup",
+      "file": "scripted-interview-REAL-recorded-setup.webm",
       "seconds": 15,
-      "bytes": 992617
+      "bytes": 1614662,
+      "source_real": true,
+      "mode": "recorded-setup-spec",
+      "run": "pilot-0",
+      "runs": null,
+      "note": "actual locked pilot-0 spec walkthrough; live interview not measured"
     },
     {
-      "beat": "live-catch-SYNTHETIC-DEV",
-      "file": "live-catch-SYNTHETIC-DEV.webm",
+      "beat": "live-catch-REAL",
+      "file": "live-catch-REAL.webm",
       "seconds": 15,
-      "bytes": 1011621
+      "bytes": 1348369,
+      "source_real": true,
+      "mode": "actual",
+      "run": "pilot-0",
+      "runs": null,
+      "note": "LIVE RECORDING \u2014 no defense catch observed; outbreak never developed (secondary infections 0)"
     },
     {
-      "beat": "split-race-SYNTHETIC-DEV",
-      "file": "split-race-SYNTHETIC-DEV.webm",
+      "beat": "split-race-REAL-exploratory-counterfactual",
+      "file": "split-race-REAL-exploratory-counterfactual.webm",
       "seconds": 20,
-      "bytes": 1163493
+      "bytes": 1126213,
+      "source_real": true,
+      "mode": "counterfactual-replay",
+      "run": null,
+      "runs": [
+        "pilot-0",
+        "pilot-1"
+      ],
+      "note": "EXPLORATORY COUNTERFACTUAL PILOT COMPARISON (N=2, 3 agents); LIVE ARM COMPARISON NOT RUN; no observed infections, R and containment not measured"
     },
     {
-      "beat": "hero-freeze-SYNTHETIC-DEV",
-      "file": "hero-freeze-SYNTHETIC-DEV.webm",
+      "beat": "hero-freeze-REAL-no-freeze-observed",
+      "file": "hero-freeze-REAL-no-freeze-observed.webm",
       "seconds": 20,
-      "bytes": 1027216
+      "bytes": 1791387,
+      "source_real": true,
+      "mode": "actual-absence",
+      "run": "pilot-0",
+      "runs": null,
+      "note": "LIVE RECORDING \u2014 no freeze occurred; containment unmeasured (no observed infections)"
     },
     {
-      "beat": "everyday-drift-SYNTHETIC-DEV",
-      "file": "everyday-drift-SYNTHETIC-DEV.webm",
+      "beat": "everyday-drift-REAL-no-steer-observed",
+      "file": "everyday-drift-REAL-no-steer-observed.webm",
       "seconds": 20,
-      "bytes": 1183895
+      "bytes": 1822104,
+      "source_real": true,
+      "mode": "actual-absence",
+      "run": "pilot-1",
+      "runs": null,
+      "note": "LIVE RECORDING \u2014 steering untested; no drift scenario in this run, no steer events"
     },
     {
-      "beat": "charts-SYNTHETIC-DEV",
-      "file": "charts-SYNTHETIC-DEV.webm",
+      "beat": "charts-REAL",
+      "file": "charts-REAL.webm",
       "seconds": 10,
-      "bytes": 305172
+      "bytes": 1070243,
+      "source_real": true,
+      "mode": "counterfactual-replay",
+      "run": null,
+      "runs": [
+        "pilot-0",
+        "pilot-1"
+      ],
+      "note": "cached-policy counterfactual arms replayed over sealed real pilot-0/pilot-1 recordings"
     },
     {
-      "beat": "receipt-SYNTHETIC-DEV",
-      "file": "receipt-SYNTHETIC-DEV.webm",
+      "beat": "receipt-REAL",
+      "file": "receipt-REAL.webm",
       "seconds": 10,
-      "bytes": 299753
+      "bytes": 470880,
+      "source_real": true,
+      "mode": "actual",
+      "run": "pilot-0",
+      "runs": null,
+      "note": "recorded no-defense receipt; counterfactual=false"
     },
     {
-      "beat": "reproduce-proof-SYNTHETIC-DEV",
-      "file": "reproduce-proof-SYNTHETIC-DEV.webm",
+      "beat": "reproduce-proof-REAL-offline-reproduction",
+      "file": "reproduce-proof-REAL-offline-reproduction.webm",
       "seconds": 15,
-      "bytes": 398382
+      "bytes": 1148796,
+      "source_real": true,
+      "mode": "offline-reproduction",
+      "run": null,
+      "runs": [
+        "pilot-0",
+        "pilot-1"
+      ],
+      "note": "REAL DATA / OFFLINE REPRODUCTION over sealed real archives"
     },
     {
-      "beat": "threat-SYNTHETIC-DEV",
-      "file": "threat-SYNTHETIC-DEV.webm",
+      "beat": "threat-REAL-documentation",
+      "file": "threat-REAL-documentation.webm",
       "seconds": 5,
-      "bytes": 285401
+      "bytes": 426828,
+      "source_real": true,
+      "mode": "documentation",
+      "run": null,
+      "runs": null,
+      "note": "current repo docs/threat-model.md; not a live event"
     },
     {
-      "beat": "repo-close-SYNTHETIC-DEV",
-      "file": "repo-close-SYNTHETIC-DEV.webm",
+      "beat": "repo-close-REAL-documentation",
+      "file": "repo-close-REAL-documentation.webm",
       "seconds": 5,
-      "bytes": 271006
+      "bytes": 718734,
+      "source_real": true,
+      "mode": "documentation",
+      "run": null,
+      "runs": null,
+      "note": "current repo README; not a live event"
     }
   ],
   "skipped": [],

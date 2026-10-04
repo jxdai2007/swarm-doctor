@@ -62,8 +62,8 @@ def test_real_authored_empirical_number_negative_control(submission):
     root, metrics, args = submission
     path = root / "docs/writeup.md"
     original = path.read_text()
-    altered = re.sub(r"\*\*[^*]+ infected agents per run\*\*",
-                     "**999.00 infected agents per run**", original)
+    altered = re.sub(r"has [0-9.]+ infected agents per run",
+                     "has 999.00 infected agents per run", original)
     assert altered != original
     path.write_text(altered)
     assert check_doc_numbers.main(args) == 1
@@ -101,8 +101,8 @@ def test_reproduce_compares_authored_without_repair(submission, tmp_path, monkey
     assert experiments.reproduce(tmp_path / "runs", derived, submission_root=root) == []
     path = root / "docs/writeup.md"
     original = path.read_bytes()
-    edited = re.sub(rb"\*\*[^*]+ infected agents per run\*\*",
-                    b"**999.00 infected agents per run**", original)
+    edited = re.sub(rb"has [0-9.]+ infected agents per run",
+                    b"has 999.00 infected agents per run", original)
     assert edited != original
     path.write_bytes(edited)
     diffs = experiments.reproduce(tmp_path / "runs", derived, submission_root=root)
@@ -159,9 +159,9 @@ def test_required_capture_real_http_failure_rejects_stale_inventory(
     stale = tmp_path / "intro-board-SYNTHETIC-DEV.webm"
     stale.write_bytes(b"prior invocation, not evidence")
     (tmp_path / "inventory.json").write_text(json.dumps({"produced": [stale.name]}))
-    monkeypatch.setattr(capture_video, "build_pages", lambda pages: {})
-    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls: [
-        ("intro-board-SYNTHETIC-DEV", base + "/?run=pilot-0", 0, "board"),
+    monkeypatch.setattr(capture_video, "build_pages", lambda pages: ({}, False))
+    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls, sources=None, live_group_real=False: [
+        ("intro-board-SYNTHETIC-DEV", base + "/?run=pilot-0", 0, "board", {"synthetic": True}),
     ])
     assert capture_video.main(["--out", str(tmp_path), "--base", snapshot_server]) == 1
     inventory = json.loads((tmp_path / "inventory.json").read_text())
@@ -244,9 +244,9 @@ async def test_capture_assert_reads_real_archived_sse_events(tmp_path):
 
 def test_optional_source_absence_not_required_capture_failure(
         tmp_path, monkeypatch, snapshot_server):
-    monkeypatch.setattr(capture_video, "build_pages", lambda pages: {})
-    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls: [
-        ("everyday-drift-SYNTHETIC-DEV", base + "/?run=drift-demo", 0, "steer"),
+    monkeypatch.setattr(capture_video, "build_pages", lambda pages: ({}, False))
+    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls, sources=None, live_group_real=False: [
+        ("everyday-drift-SYNTHETIC-DEV", base + "/?run=drift-demo", 0, "steer", {"synthetic": True}),
     ])
     assert capture_video.main(["--out", str(tmp_path), "--base", snapshot_server]) == 0
     inventory = json.loads((tmp_path / "inventory.json").read_text())
@@ -273,11 +273,11 @@ def test_reproduce_process_failure_aborts_capture_preparation(tmp_path, monkeypa
 def test_reported_stale_video_cannot_be_current_success(tmp_path, monkeypatch):
     stale = tmp_path / "intro-board-SYNTHETIC-DEV.webm"
     stale.write_bytes(b"prior capture")
-    monkeypatch.setattr(capture_video, "build_pages", lambda pages: {})
-    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls: [
-        ("intro-board-SYNTHETIC-DEV", "file:///unused", 0, "static"),
+    monkeypatch.setattr(capture_video, "build_pages", lambda pages: ({}, False))
+    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls, sources=None, live_group_real=False: [
+        ("intro-board-SYNTHETIC-DEV", "file:///unused", 0, "static", {"synthetic": True}),
     ])
-    monkeypatch.setattr(capture_video, "capture_one", lambda *args: stale)
+    monkeypatch.setattr(capture_video, "capture_one", lambda *args, **kwargs: stale)
     assert capture_video.main(["--out", str(tmp_path)]) == 1
     inventory = json.loads((tmp_path / "inventory.json").read_text())
     assert inventory["produced"] == []
@@ -285,9 +285,9 @@ def test_reported_stale_video_cannot_be_current_success(tmp_path, monkeypatch):
 
 
 def test_present_optional_source_capture_failure_is_fatal(tmp_path, monkeypatch):
-    monkeypatch.setattr(capture_video, "build_pages", lambda pages: {})
-    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls: [
-        ("everyday-drift-SYNTHETIC-DEV", "file:///unused", 0, "steer"),
+    monkeypatch.setattr(capture_video, "build_pages", lambda pages: ({}, False))
+    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls, sources=None, live_group_real=False: [
+        ("everyday-drift-SYNTHETIC-DEV", "file:///unused", 0, "steer", {"synthetic": True}),
     ])
 
     def failed_browser(*args):
@@ -303,12 +303,12 @@ def test_present_optional_source_capture_failure_is_fatal(tmp_path, monkeypatch)
 def test_only_current_stage_video_published(tmp_path, monkeypatch):
     stale = tmp_path / "unrelated-old-clip.webm"
     stale.write_bytes(b"old")
-    monkeypatch.setattr(capture_video, "build_pages", lambda pages: {})
-    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls: [
-        ("current-test-beat", "file:///unused", 0, "static"),
+    monkeypatch.setattr(capture_video, "build_pages", lambda pages: ({}, False))
+    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls, sources=None, live_group_real=False: [
+        ("current-test-beat", "file:///unused", 0, "static", {"synthetic": True}),
     ])
 
-    def current_video(name, url, seconds, kind, stage, base):
+    def current_video(name, url, seconds, kind, stage, base, source=None):
         # Test-only bytes exercise publication, not a scientific video claim.
         path = stage / (name + ".webm")
         path.write_bytes(b"current invocation test payload")

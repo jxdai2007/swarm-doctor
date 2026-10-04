@@ -24,27 +24,29 @@ never from the checker (KTD4). Defenses are evaluated by replaying recorded
 runs (KTD6 counterfactual semantics); a subset runs live with the defense
 active, and the replay-vs-live gap is reported (R29).
 
-## Results — [unmeasured] / [SYNTHETIC DEV]
+## Results
 
-Current committed artifacts are synthetic fixture recordings
-(`experiments/committed/`). The metric values they produce are visible in
-[docs/generated/README-metrics.md](generated/README-metrics.md) and the
-outbreak receipts; they demonstrate that the pipeline computes and binds
-numbers, and are NOT evidence about real model swarms. The no-defense
-fixture aggregate has **2.00 infected agents per run**
-([SYNTHETIC DEV]; source: `analysis.json/doc_metrics/no-defense/metrics.infected`).
+Recorded sources include REAL pilot calibration recordings (synthetic=False); the confirmatory main 5-agent cohort has not been run, so headline hypothesis claims stay exploratory/not measured.
+
+The real pilot-calibration aggregate (group `actual-d2a888ac`, role pilot-calibration, 3 agents × 20 turns, served ['kimi-for-coding']) has 0.0 infected agents per run and finish rate 0.16666666666666666; with zero observed infections the R and containment denominators are null — this is NOT a claim of R below one or of containment. The five-agent main baseline was not run (N=0).
 
 ## Hypotheses (R30) — status
 
+**Reading the table:** Supported/refuted means observed direction only, not
+inferential hypothesis proof. No significance, noninferiority, or "far fewer"
+margin was preregistered — in particular, any observed clean-freeze reduction
+cannot by itself establish H2's "far fewer". N is the count of observed
+eligible comparisons, never a target.
+
 | # | Hypothesis | Status |
 |---|---|---|
-| H1 | Damage rises with detection delay | [unmeasured] — delay sweep implemented; awaits pilot recordings |
-| H2 | Verified tracing contains as well as blunt kill with far fewer clean agents frozen | [unmeasured] |
-| H3 | Strict mode preserves more work than kill-all | [unmeasured] |
-| H4 | The interview cuts false alarms | [unmeasured] — ablation implemented on decision caches |
-| H5 | Prevention lowers R | [unmeasured] |
-| H6 | Fast-checker confidence is/is not calibrated enough to set the radius | [unmeasured] — calibration analysis implemented; needs operator labels |
-| H7 | Below One cuts wasted spend versus prompt-only with few false steers | [unmeasured] |
+| H1 | Damage rises with detection delay | inconclusive (N=2; source: post-hoc exploratory replay of sealed real 3-agent pilot calibration recordings; mode: exploratory-pilot-replay) — Observed endpoint damage changes per eligible recording: [0, 0]; model/scenario strata remain separate. Resource-limited exploratory fallback; requested five-agent main study has N=0. |
+| H2 | Verified tracing contains as well as blunt kill with far fewer clean agents frozen | not_measured (N=0; source: Missing prerequisite: post-hoc exploratory replay of sealed real 3-agent pilot calibration recordings; mode: not-measured) — Paired containment and clean-frozen effects are retained per baseline/model stratum. Resource-limited exploratory fallback; requested five-agent main study has N=0. No complete eligible comparison is available. No eligible outbreak denominator; no-outbreak records are not containment evidence. |
+| H3 | Strict mode preserves more work than kill-all | not_measured (N=0; source: no sealed kill-all comparison; mode: not-measured) — Strict versus kill-all is not measured: existing blunt K-hop arm is not a kill-all comparator. |
+| H4 | The interview cuts false alarms | inconclusive (N=2; source: post-hoc exploratory replay of sealed real 3-agent pilot calibration recordings; mode: exploratory-pilot-replay) — Observed one-line minus locked-spec false-alarm differences: [0, 0]; false-steer differences: [8, 7]. Resource-limited exploratory fallback; requested five-agent main study has N=0. |
+| H5 | Prevention lowers R | not_measured (N=0; source: Missing prerequisite: sealed paired actual-live five-agent prevention validation; mode: not-measured) — Actual paired prevention-off minus prevention-on R is retained per validation/model stratum. No complete eligible comparison is available. |
+| H6 | Fast-checker confidence is/is not calibrated enough to set the radius | not_measured (N=0; source: operator labels absent or no preregistered radius-calibration criterion; mode: not-measured) — Operator ground-truth labels required; radius calibration is not inferred from model judgments. |
+| H7 | Below One cuts wasted spend versus prompt-only with few false steers | not_measured (N=0; source: Missing prerequisite: cached-policy replays of sealed real five-agent drift baseline recordings; mode: not-measured) — Wasted-USD reductions and false steers are retained per eligible drift/model stratum. No complete eligible comparison is available. |
 
 ## Replay versus live
 
@@ -54,7 +56,4 @@ claims a live gap measurement.
 
 ## Failed hypotheses and negative results
 
-No live hypothesis outcomes have been measured yet; the synthetic checks in
-this repo are development verification, not scientific results. Measured
-outcomes — including failures — will be reported here as real pilot and live
-data land (R38).
+Live hypothesis outcomes are limited to the exploratory pilot replay reported above; the confirmatory main cohort was not run, so most hypotheses remain not measured — including failures — until real main data exist (R38).

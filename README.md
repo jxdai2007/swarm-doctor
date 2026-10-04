@@ -16,7 +16,10 @@ Two dials, one engine:
 ## Quick start (oh-my-pi swarm)
 
 ```bash
-# 0. prerequisites
+# 0. prerequisites — while the repo default branch is setup-only, clone the
+#    tested branch explicitly:
+git clone --branch feat/below-one https://github.com/jxdai2007/below-one.git
+cd below-one
 uv sync                                    # python engine + deps
 uv run python scripts/first_hour_checks.py # verify model endpoints + omp
 
@@ -40,9 +43,7 @@ place (operator items in `OPERATOR_TODO.md`) — it never fakes a run.
 
 See [docs/generated/README-metrics.md](docs/generated/README-metrics.md).
 Every number there regenerates offline from committed run artifacts with
-`make reproduce` — no network, no API keys. Current committed artifacts are
-**SYNTHETIC DEV fixtures**; live-model results are added only when real pilot
-recordings exist (R33).
+`make reproduce` — no network, no API keys. Recorded sources include REAL pilot calibration recordings (synthetic=False); the confirmatory main 5-agent cohort has not been run, so headline hypothesis claims stay exploratory/not measured.
 
 ## Docs
 

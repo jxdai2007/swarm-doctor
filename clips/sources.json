@@ -1,0 +1,23 @@
+{
+  "board": {"run": "pilot-0", "synthetic": false,
+            "note": "LIVE RECORDING — real 3-agent pilot run (calibration cohort)",
+            "allow_absent": false},
+  "catch": {"run": "pilot-0", "synthetic": false,
+            "note": "LIVE RECORDING — no defense catch observed; outbreak never developed (secondary infections 0)",
+            "allow_absent": true},
+  "freeze": {"run": "pilot-0", "synthetic": false,
+             "note": "LIVE RECORDING — no freeze occurred; containment unmeasured (no observed infections)",
+             "allow_absent": true},
+  "steer": {"run": "pilot-1", "synthetic": false,
+            "note": "LIVE RECORDING — steering untested; no drift scenario in this run, no steer events",
+            "allow_absent": true},
+  "split": {"synthetic": false, "mode": "counterfactual-replay",
+            "kind_label": "exploratory-counterfactual",
+            "runs": ["pilot-0", "pilot-1"],
+            "note": "EXPLORATORY COUNTERFACTUAL PILOT COMPARISON (N=2, 3 agents); LIVE ARM COMPARISON NOT RUN; no observed infections, R and containment not measured"},
+  "charts": {"synthetic": false, "mode": "counterfactual-replay",
+             "runs": ["pilot-0", "pilot-1"],
+             "note": "cached-policy counterfactual arms replayed over sealed real pilot-0/pilot-1 recordings"},
+  "receipt": {"synthetic": false, "mode": "actual", "run": "pilot-0",
+              "note": "recorded no-defense receipt; counterfactual=false"}
+}

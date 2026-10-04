@@ -1,6 +1,6 @@
 # PROGRESS — Below One
 
-Durable record from session transcript facts. Synthetic/live boundary: no live-model scientific evidence exists yet. Historical verification and published commits are not current canonical acceptance.
+Durable record from session transcript facts. Synthetic/live boundary (updated 2026-10-04 overnight): FIRST real live-model recordings exist — 2 complete 3-agent pilot calibration runs (exploratory evidence only; zero infections, grader case4 FAILED both) — but the 5-agent main cohort never launched (N=0), so confirmatory hypothesis evidence still does not exist. Historical verification and published commits are not current canonical acceptance.
 
 ## Committed (branch feat/below-one → origin)
 
@@ -28,8 +28,8 @@ Durable record from session transcript facts. Synthetic/live boundary: no live-m
 - Ops source: study targets pass explicit mode with `MODE=live` default and keyless `MODE=synthetic` override; demo uses `uv run --frozen --env-file .env`. CI verifies the real can1357/oh-my-pi v18.5.0 Linux release checksum before execution, requires `omp/18.5.0`, installs the uv.lock-pinned Playwright chromium/headless-shell before the offline phase, and runs the scanner heredoc directly over tracked files. Linux installation/runtime proven by CI run 37175671867 (success).
 - Existing ops commits 207e0ed and ff13462 remain intact. Archival state settled by parent decision A (commit 40f437d): the later internally consistent hero-verify sealed take is canonical; forensic record in DECISIONS.md; older take retrievable in git history.
 - Coordinator/parent pending items are CLOSED: CI scanner heredoc exercised in CI; canonical fullsuite, check-env, freshclone keyless test/reproduce, current regeneration, eleven-beat capture with inventory, and final document/link checks all hold receipts in root GATES.md. Frozen `experiments/committed/runs` untouched (no reseal); `experiments/derived` and `experiments/display` are gitignored build outputs.
-- Live/operator gates remain unmet: provider credentials and spend approval, real three-agent native pilot/study recordings, live setup interview, trusted operator monitor labels/check exports, scientific hypothesis evidence, narration/assembly, public repository flip and final submission. Synthetic fixtures and historical clips cannot satisfy these outcomes.
+- Live/operator gates remain PARTIALLY met after the 2026-10-04 overnight run: real 3-agent pilot recordings exist (pilot-0/1 complete, pilot-2 sealed partial; 85-event frozen operator sample published, ZERO operator labels yet); exploratory-pilot-replay H1/H4 inconclusive, H2/H3/H5/H6/H7 not_measured; main 5-agent study N=0 (local Kimi window-guard stop after 300 known attempts; OpenRouter native cap not breached). Still unmet: operator labels, live setup interview, narration/assembly, public flip with feat/below-one default, submission. Synthetic fixtures and historical clips cannot satisfy these outcomes.
 
 ## Blocked (operator-only)
 
-OPERATOR_TODO.md: OpenRouter $15 credit+key, Kimi Code key/login, repo public. Live experiments, operator labels/interview/narration/submission remain blocked; synthetic DEV artifacts must be labeled; study hypotheses must never claim measurement from synthetic runs.
+OPERATOR_TODO.md (current): operator labeling of the frozen 85-event sample; regenerate/reproduce/docs; narration/assembly; public flip with feat/below-one default BEFORE submission; submission form. Credentials are present and endpoint checks PASS; spend stop was the LOCAL Kimi window guard (not provider quota, not the $15 OpenRouter cap). Synthetic DEV artifacts must be labeled; study hypotheses must never claim measurement from synthetic runs.

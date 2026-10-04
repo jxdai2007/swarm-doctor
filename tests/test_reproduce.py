@@ -47,6 +47,12 @@ def sealed_runs(tmp_path):
 def regenerated(sealed_runs, tmp_path):
     derived = tmp_path / "derived"
     analysis = experiments.regenerate(sealed_runs, derived)
+    # Authored docs link sibling repo artifacts (clips, plans, generated
+    # metrics); mirror the repo layout so link checks bind the fixture bytes.
+    (derived / "authored" / "clips").symlink_to(ROOT / "clips")
+    (derived / "authored" / "docs" / "plans").symlink_to(ROOT / "docs" / "plans")
+    (derived / "authored" / "docs" / "generated").symlink_to(derived / "docs")
+    (derived / "authored" / "generated").symlink_to(derived / "docs")
     return sealed_runs, derived, analysis
 
 
@@ -73,8 +79,9 @@ def replay_revision_evaluator_root(tmp_path, monkeypatch):
 
 def _replay_revision_submission(derived, destination):
     """Use regenerated authored bytes and real linked repository artifacts."""
-    shutil.copytree(derived / "authored", destination)
-    shutil.copytree(derived / "docs", destination / "docs/generated")
+    shutil.copytree(derived / "authored", destination, symlinks=True)
+    if not (destination / "docs/generated").exists():
+        shutil.copytree(derived / "docs", destination / "docs/generated")
     for document in destination.rglob("*.md"):
         for target in re.findall(r"\]\(([^)]+)\)", document.read_text()):
             if target.startswith(("http://", "https://", "mailto:")):
@@ -552,7 +559,8 @@ def test_doc_checker_fails_on_edited_number_and_passes_clean(regenerated):
 
     _, derived, _ = regenerated
     path = derived / "analysis.json"
-    args = ["--metrics-glob", str(path), "--docs", str(derived / "docs")]
+    args = ["--metrics-glob", str(path), "--docs", str(derived / "docs"),
+            "--root", str(derived / "authored")]
     assert check_main(args) == 0
     edited = json.loads(path.read_text())
     edited["doc_metrics"]["no-defense"]["metrics.infected"] += 1
@@ -560,8 +568,9 @@ def test_doc_checker_fails_on_edited_number_and_passes_clean(regenerated):
     assert check_main(args) == 1
 
 
-def test_actual_recordings_regenerate_all_artifacts_and_reproduce(regenerated, capsys):
+def test_actual_recordings_regenerate_all_artifacts_and_reproduce(regenerated, capsys, tmp_path):
     runs, derived, analysis = regenerated
+    submission = _replay_revision_submission(derived, tmp_path / "submission")
     assert set(analysis["runs"]) == set(CANONICAL_RUNS)
     assert json.loads((derived / "analysis.json").read_text()) == analysis
     assert analysis["monitor"] == {
@@ -611,7 +620,7 @@ def test_actual_recordings_regenerate_all_artifacts_and_reproduce(regenerated, c
         data = json.loads((derived / "figures" / f"{stem}.json").read_text())
         assert data["synthetic"] is True
         assert data["source"] == "synthetic-development"
-    assert experiments.reproduce(runs, derived) == []
+    assert experiments.reproduce(runs, derived, submission_root=submission) == []
     assert "SKIP" not in capsys.readouterr().out
 
 
@@ -645,8 +654,9 @@ def test_aggregation_uses_three_unique_outbreak_seeds_and_no_single_seed_ci(rege
 
 
 @pytest.mark.parametrize("target", ["metric", "analysis"])
-def test_edited_derived_number_reports_named_key(regenerated, target):
+def test_edited_derived_number_reports_named_key(regenerated, target, tmp_path):
     runs, derived, _ = regenerated
+    submission = _replay_revision_submission(derived, tmp_path / "submission")
     if target == "metric":
         path = derived / "runs" / "pilot-0" / "metrics.json"
         key = "infected"
@@ -658,7 +668,7 @@ def test_edited_derived_number_reports_named_key(regenerated, target):
         edited = json.loads(path.read_text())
         edited["runs"]["pilot-0"]["metrics"]["infected"] += 1
     path.write_text(json.dumps(edited))
-    diffs = experiments.reproduce(runs, derived)
+    diffs = experiments.reproduce(runs, derived, submission_root=submission)
     assert any(path.relative_to(derived).as_posix() in diff and key in diff for diff in diffs)
 
 
@@ -671,8 +681,9 @@ def test_reproduction_compares_artifact_bytes_not_only_json_values(regenerated):
 
 
 @pytest.mark.parametrize("key", ["infected", "defense_cost_usd", "time_to_done"])
-def test_edited_source_metric_resealed_still_reports_recomputed_key(regenerated, key):
+def test_edited_source_metric_resealed_still_reports_recomputed_key(regenerated, tmp_path, key):
     runs, derived, _ = regenerated
+    submission = _replay_revision_submission(derived, tmp_path / "submission")
     run = runs / "pilot-0"
     path = run / "metrics.json"
     edited = json.loads(path.read_text())
@@ -681,7 +692,7 @@ def test_edited_source_metric_resealed_still_reports_recomputed_key(regenerated,
     (run / "manifest.json").unlink()
     (runs / ".seals" / "pilot-0.sha256").unlink()
     RunStore(runs).seal(run)
-    diffs = experiments.reproduce(runs, derived)
+    diffs = experiments.reproduce(runs, derived, submission_root=submission)
     assert any("pilot-0" in diff and key in diff for diff in diffs)
 
 
@@ -882,7 +893,9 @@ def test_supplied_operator_label_subset_analyzes_validated_recorded_checks(seale
     assert monitor["provenance"]["label_count"] == 1
     assert monitor["provenance"]["event_ids"] == [event_id]
     assert monitor["provenance"]["live"] is False
-    assert experiments.reproduce(sealed_runs, output, labels=labels, monitor_checks=export) == []
+    submission = _replay_revision_submission(output, tmp_path / "submission")
+    assert experiments.reproduce(sealed_runs, output, labels=labels, monitor_checks=export,
+                                 submission_root=submission) == []
     assert json.loads((output / "monitor-checks.json").read_text()) == checks
     assert not (sealed_runs.parent / "labels").exists()
     checks[event_id]["source"]["action_id"] = "foreign-action"

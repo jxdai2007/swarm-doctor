@@ -71,3 +71,16 @@
 - Authorized post-hoc fallback: when the requested five-agent main cohort has no complete recordings, H1/H2/H4 may expose narrowly labeled exploratory cached-policy replay of the two complete three-agent calibration recordings. Eligible N is two, confirmatory main N remains zero, cohorts never pool, and H2 remains not measured when neither recording has an outbreak opportunity. H5/H7 do not borrow this fallback.
 - Sealed pilot-2 failed during the primary protocol, before shadow caching: five proposed actions per agent, no completed outcome or finish, no shadow decisions/spec/checks/summary files, and cleanup kills at about 60 seconds. Primary-complete and cache-complete counts are both two, not three.
 - Both complete pilot recordings retain unsuccessful final task grading (held-out case 4 failed), zero infections and zero secondary infections. Complete recording means transport/cache completeness, not task success or proven containment. Exploratory H1/H4 effects are reported per recording without cross-stratum averaging; zero-effect pilot comparisons are inconclusive.
+
+## 2026-10-04 overnight run — known limitations (review findings recorded as limitations, not blocking P1 fixes; shipping override by Jollen)
+
+1. Experiment-module evaluator/reporting hash coupling — extraction proposal rejected: insufficient benefit against project rules; coupling documented instead.
+2. Detector generic checker/judge catch can swallow terminal quota/credit stops and may mark a shadow-cache run complete.
+3. Drift five-agent baseline can contaminate main-outbreak/H1 eligibility (drift eligibility handled separately).
+4. HTTP 402 is not stored as a replay failure / typed offline BudgetExceeded.
+5. Generic actual-group prose in doc_templates hardcodes pilot/no-infection/main-N=0 assumptions; a future infected main cohort needs the derivation generalized.
+6. Cohort-switch regenerate leaves obsolete generated owned outputs in experiments/derived.
+7. Eager optional freeze/steer probes can abort an entire capture preparation instead of skipping the beat.
+8. Default fixture capture depends on real pilots and can mislabel a real page as DEV without explicit --sources.
+
+Native adapter limitation: omp native probes fail with TimeoutExpired (~30s client deadline); the study ran on the in-process experiment-harness fallback (script child exit 0 is not a native-probe PASS; exact wrapper exit unknown).
