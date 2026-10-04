@@ -117,6 +117,20 @@
         "spent_usd": "0.017476452",
         "stop_reason": null
       }
+    },
+    {
+      "phase": "injected-paired-incomplete",
+      "seed": 104,
+      "backend": "kimi",
+      "source_commit": "9f35ccc",
+      "meter": {
+        "budget_breached": false,
+        "cap_usd": "15",
+        "providers": {},
+        "reserved_usd": "0",
+        "spent_usd": "0",
+        "stop_reason": null
+      }
     }
   ],
   "probes": [
@@ -132,5 +146,25 @@
     }
   ],
   "accounting_rule": "Each phase meter is cumulative across its own arms: take only final arm meter; do not sum arm summary meters. Native key cumulative usage includes prior calls and may lag. Kimi nominal zero is not an actual billing receipt.",
-  "reported_new_campaign_openrouter_cost_usd": "0.13613463172"
+  "reported_new_campaign_openrouter_cost_usd": "0.13613463172",
+  "final_native_key_read_only_receipt": {
+    "http_status": 200,
+    "limit": 15,
+    "limit_remaining": 14.844710178,
+    "limit_reset": null,
+    "retrieved_at": "2026-10-04T16:20:58.567664+00:00",
+    "usage": 0.155289822,
+    "usage_daily": 0.155289822,
+    "usage_monthly": 0.155289822
+  },
+  "early_stop": {
+    "local_time": "2026-10-04T09:20:20.009832-07:00",
+    "reason": "Second same-step technical provider HTTPStatusError; user failure override",
+    "owned_model_jobs_remaining": 0,
+    "paid_model_calls_after_stop": 0,
+    "final_complete_paired_seeds": [
+      101,
+      102
+    ]
+  }
 }
