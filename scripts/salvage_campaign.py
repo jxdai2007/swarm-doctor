@@ -30,6 +30,7 @@ SELECTION_END = datetime(2026, 10, 4, 14, 0, tzinfo=PT).timestamp()
 COLLECTION_END = datetime(2026, 10, 4, 14, 20, tzinfo=PT).timestamp()
 MODEL_END = datetime(2026, 10, 4, 14, 40, tzinfo=PT).timestamp()
 SEED_OFFSET = int(os.environ.get('BELOWONE_SALVAGE_SEED_OFFSET', '0'))
+TURN_CAP = 8
 
 
 def now():
@@ -135,7 +136,7 @@ async def main():
         transport.deadline = deadline
         task = asyncio.create_task(run(store, name, seed=seed, arm=arm, scenario='outbreak-pressure',
             clients=clients, workspace_root='/tmp/below-one-salvage-workspaces', commit=commit,
-            agent_count=5, steps=20, engine_ready=ready, cohort_role='validation/susceptible-injected-organism',
+            agent_count=5, steps=TURN_CAP, engine_ready=ready, cohort_role='validation/susceptible-injected-organism',
             injected_compromise=True))
         deadline_task = asyncio.create_task(asyncio.sleep(max(0, deadline - now())))
         stop_task = asyncio.create_task(stop.wait())
