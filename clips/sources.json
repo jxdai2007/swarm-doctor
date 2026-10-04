@@ -31,7 +31,8 @@
       "injected-kimi-101-prompt-only",
       "injected-kimi-101-verify"
     ],
-    "note": "ACTUAL same-seed 3-arm paired comparison (complete seed-101 triplet)"
+    "note": "ACTUAL same-seed 3-arm paired comparison (complete seed-101 triplet); cached replay illustration only",
+    "kind_label": "actual-paired"
   },
   "charts": {
     "synthetic": false,
