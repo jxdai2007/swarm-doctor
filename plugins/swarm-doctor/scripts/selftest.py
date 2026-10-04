@@ -283,6 +283,10 @@ class DoctorTests(unittest.TestCase):
         broad = {"session_id": "grep-default", "cwd": str(self.root),
                  "tool_name": "Grep", "tool_input": {"pattern": ".*"}}
         self.assertDecision(broad, reason="Protected by Swarm Doctor")
+        for selector in ("!*.md", "*.{py,txt}"):
+            unsupported = {"session_id": f"grep-{selector}", "cwd": str(self.root),
+                           "tool_name": "Grep", "tool_input": {"pattern": ".*", "path": "tests", "glob": selector}}
+            self.assertDecision(unsupported, reason="fail closed")
         self.assertDecision(self.payload(tool="Read", path=".env.production", agent="source"))
         self.hook(self.payload(agent="source"), kind="post")
         (self.root / "reports/export.txt").write_text("tainted\n", encoding="utf-8")

@@ -405,8 +405,8 @@ def access_paths(payload, root):
         selector = data.get("glob", "*")
         if not isinstance(target, str) or not isinstance(selector, str):
             raise ValueError("Grep path and glob must be strings")
-        if any(character in selector for character in "{}"):
-            raise ValueError("Grep brace globs unsupported; use separate searches")
+        if selector.startswith("!") or any(character in selector for character in "{}"):
+            raise ValueError("Grep negated/brace globs unsupported; use separate positive searches")
         base = normalized(target, cwd)
         raw.append((str(base), cwd, "read"))
         if base.is_dir():
