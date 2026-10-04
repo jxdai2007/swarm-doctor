@@ -80,7 +80,8 @@ def _derived_synthetic(group: str = "pilot-0") -> bool:
 
 def build_pages(pages: Path, archive_run: str = "pilot-0",
                 archive_root: str = "experiments/committed/live-runs",
-                archived_runs_note: str = "pilot-0/pilot-1") -> tuple[dict[str, str], bool]:
+                archived_runs_note: str = "pilot-0/pilot-1",
+                receipt_arm: str = "no-defense") -> tuple[dict[str, str], bool]:
     pages.mkdir(parents=True, exist_ok=True)
     live_group_badge = ("LIVE RECORDING — real measured run"
                         if not _derived_synthetic(archive_run) else DEV_BADGE)
@@ -119,8 +120,15 @@ def build_pages(pages: Path, archive_run: str = "pilot-0",
 
     # Full comparison-only reproduction over real archives: failed proof
     # cannot become a clip. REAL DATA / OFFLINE REPRODUCTION badge.
-    repro = subprocess.run(["make", "reproduce"], capture_output=True,
-                           text=True, cwd=ROOT)
+    capture_derived = Path(tempfile.mkdtemp(prefix="capture-derived-"))
+    shutil.copytree(ROOT / "experiments/derived", capture_derived,
+                    dirs_exist_ok=True)
+    repro = subprocess.run(
+        ["make", "reproduce", f"RUNS={archive_root}",
+         f"OUTPUTS={capture_derived}",
+         "LABELS=labels/pressure_labels-RULE-DERIVED.jsonl",
+         "MONITOR_CHECKS=experiments/derived/monitor-checks.json"],
+        capture_output=True, text=True, cwd=ROOT)
     if repro.returncode != 0:
         raise RuntimeError(f"make reproduce failed (exit {repro.returncode}): "
                            + (repro.stdout + repro.stderr)[-2000:])
@@ -133,10 +141,11 @@ def build_pages(pages: Path, archive_run: str = "pilot-0",
                        f"{archived_runs_note} archives"))
 
     # Source-bound receipt published by regeneration and checked above.
-    receipt_path = ROOT / "experiments/derived/receipts" / archive_run / "no-defense.txt"
+    receipt_path = (ROOT / "experiments/derived/receipts" / archive_run /
+                    f"{receipt_arm}.txt")
     receipt_text = receipt_path.read_text()
     urls["receipt"] = write(
-        "receipt.html", page(f"Outbreak receipt — {archive_run}, no-defense",
+        "receipt.html", page(f"Outbreak receipt — {archive_run}, {receipt_arm}",
                              "<pre>" + html.escape(receipt_text) + "</pre>",
                              badge=live_group_badge))
 
@@ -149,20 +158,38 @@ def build_pages(pages: Path, archive_run: str = "pilot-0",
     body = "".join(f"<img src='{(figures / (n + '.svg')).as_uri()}'>"
                    for n in names)
     urls["charts"] = write("charts.html", page("Doc figures — counterfactual "
-                                               "replay of real pilot recordings "
+                                               "replay of real recordings "
                                                "(cached-policy arms over sealed "
-                                               f"{archived_runs_note})", body,
+                                               f"{archived_runs_note})", body
+                                               + "<p><span class='badge'>CAVEAT: cached replay also evaluates the scripted setup "
+                                               "and may prevent the injected source itself — this is an illustration, "
+                                               "not a live dose or comparable P0; headline numbers use the actual "
+                                               "same-seed 3-arm metrics.</span></p>",
                                                badge=live_group_badge))
 
     analysis = json.loads((ROOT / "experiments/derived/analysis.json").read_text())
-    pilot_groups = [group for group in analysis["groups"].values()
-                    if group["role"] == "pilot-calibration"
-                    and group["agent_count"] == 3 and group["run_count"] == 2
-                    and group["recordings"] == ["pilot-0", "pilot-1"]
-                    and not group["synthetic"]]
-    if len(pilot_groups) != 1:
-        raise RuntimeError("Split comparison requires the complete real pilot-0/pilot-1 cohort")
-    group = pilot_groups[0]
+    triplet_groups = [group for group in analysis["groups"].values()
+                      if group["run_count"] == 3 and not group["synthetic"]
+                      and all(r.startswith("injected-kimi-101")
+                              for r in group["recordings"])
+                      and set(("no-defense", "prompt-only", "verify"))
+                      <= set(group["arms"])]
+    if len(triplet_groups) == 1:
+        group, split_note = triplet_groups[0], (
+            "ACTUAL same-seed 3-arm paired comparison (complete triplet); "
+            "cached-policy replay illustration")
+    else:
+        pilot_groups = [group for group in analysis["groups"].values()
+                        if group["role"] == "pilot-calibration"
+                        and group["agent_count"] == 3
+                        and group["run_count"] == 2
+                        and group["recordings"] == ["pilot-0", "pilot-1"]
+                        and not group["synthetic"]]
+        if len(pilot_groups) != 1:
+            raise RuntimeError("Split comparison requires the complete real pilot-0/pilot-1 cohort")
+        group, split_note = pilot_groups[0], (
+            "N=2 complete recordings; 3 agents; cached-policy replay, not "
+            "three live intervention arms.")
     panels = []
     for arm in ("no-defense", "prompt-only", "verify"):
         metrics = group["arms"][arm]["metrics"]
@@ -180,9 +207,11 @@ def build_pages(pages: Path, archive_run: str = "pilot-0",
     urls["split-race"] = write(
         "split.html",
         page("EXPLORATORY COUNTERFACTUAL PILOT COMPARISON",
-             "<p>N=2 complete recordings; 3 agents; seeds 0/1; served model: "
-             + html.escape(", ".join(group["served_models"]))
-             + ". Cached-policy replay, not three live intervention arms.</p>"
+             "<p>" + split_note + " Seeds: "
+             + html.escape(", ".join(str(x) for x in group["seeds"]))
+             + "; agents: " + str(group["agent_count"])
+             + "; served model: "
+             + html.escape(", ".join(group["served_models"])) + ".</p>"
              "<p>No observed infections: R and containment are not measured, "
              "not evidence of R below one or successful containment.</p>"
              "<div style='display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px'>"

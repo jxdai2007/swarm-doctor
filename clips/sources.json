@@ -25,8 +25,13 @@
   },
   "split": {
     "synthetic": false,
-    "unmeasured": true,
-    "note": "LIVE SERVER \u2014 live arm comparison not run (paired triplet in progress); panels show unavailable"
+    "mode": "counterfactual-replay",
+    "runs": [
+      "injected-kimi-101-no-defense",
+      "injected-kimi-101-prompt-only",
+      "injected-kimi-101-verify"
+    ],
+    "note": "ACTUAL same-seed 3-arm paired comparison (complete seed-101 triplet)"
   },
   "charts": {
     "synthetic": false,
@@ -39,7 +44,7 @@
   "receipt": {
     "synthetic": false,
     "mode": "actual",
-    "run": "injected-kimi-101-no-defense",
-    "note": "recorded no-defense receipt; counterfactual=false"
+    "run": "injected-kimi-101-verify",
+    "note": "recorded verify-arm receipt; counterfactual=false"
   }
 }

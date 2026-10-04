@@ -36,20 +36,20 @@ experiments:
 #   make reproduce LABELS=labels/monitor_labels.jsonl [MONITOR_CHECKS=experiments/derived/monitor-checks.json]
 LABELS ?=
 MONITOR_CHECKS ?=
+OUTPUTS ?= experiments/derived
 
 # Comparison-only when experiments/derived exists; full initialization via
 # `make regenerate` (a pre-reproduce regenerate would mask edited artifacts).
 reproduce:
 	uv run --frozen python -m belowone.experiments reproduce \
 	  --runs $(RUNS) \
-	  --outputs experiments/derived \
+	  --outputs $(OUTPUTS) \
 	  $(if $(LABELS),--labels $(LABELS)) \
 	  $(if $(MONITOR_CHECKS),--monitor-checks $(MONITOR_CHECKS))
 
 regenerate:
 	uv run --frozen python -m belowone.experiments regenerate \
 	  --runs $(RUNS) \
-	  --outputs experiments/derived \
 	  $(if $(LABELS),--labels $(LABELS)) \
 	  $(if $(MONITOR_CHECKS),--monitor-checks $(MONITOR_CHECKS))
 
