@@ -569,6 +569,8 @@ def _analyze(runs_dir, recordings=None, *, labels=None, monitor_checks=None):
     if cohort_path.is_symlink():
         raise ValueError('Cohort declaration must not be a symlink')
     cohorts = _json(cohort_path)['runs'] if cohort_path.is_file() else {}
+    audit_path = root / 'campaign-audit.json'
+    campaign_audits = {row['run']: row for row in _json(audit_path)['runs']} if audit_path.is_file() else {}
     for run in runs:
         if run.name in seen:
             raise ValueError(f'Duplicate recording ID {run.name}')
@@ -580,6 +582,13 @@ def _analyze(runs_dir, recordings=None, *, labels=None, monitor_checks=None):
                       'source_commit': (run / 'commit.txt').read_text().strip()}
         if (run / 'incomplete.json').is_file():
             incomplete[run.name] = {**_json(run / 'incomplete.json'), 'provenance': provenance}
+            continue
+        audit = campaign_audits.get(run.name)
+        if audit and audit.get('seal_sha256') and audit['seal_sha256'] != provenance['seal_sha256']:
+            raise ValueError(f'Campaign audit does not bind current sealed run {run.name}')
+        if audit and not audit['complete']:
+            incomplete[run.name] = {**audit, 'provenance': provenance,
+                                    'source': 'independent-pressure-campaign-completion-audit'}
             continue
         row, results, events, decisions = _load_run(run)
         data[run.name] = row
@@ -694,6 +703,27 @@ def _analyze(runs_dir, recordings=None, *, labels=None, monitor_checks=None):
                                   'run_count', 'recordings', 'seeds', 'recorded_arm', 'prevention',
                                   'injected_compromise', 'requested_model', 'backend_pin')}}
     analysis['actual_live_groups'] = actual_groups
+    pressure_pairs = defaultdict(list)
+    for name, row in data.items():
+        config = row['config']
+        if config.get('cohort_role') == 'validation/injected-pressure':
+            key = (config['seed'], config['scenario'], config.get('backend_pin'),
+                   config.get('requested_model'), tuple(config['served_models']))
+            pressure_pairs[key].append(name)
+    paired = []
+    for key, names in sorted(pressure_pairs.items()):
+        arms = [data[name]['config']['arm'] for name in names]
+        paired.append({'seed': key[0], 'scenario': key[1], 'backend_pin': key[2],
+                       'requested_model': key[3], 'served_models': list(key[4]),
+                       'injected_compromise': True, 'recordings': sorted(names),
+                       'arms': sorted(arms), 'complete': len(arms) == 3 and
+                       set(arms) == {'no-defense', 'prompt-only', 'verify'}})
+    analysis['pressure_campaign'] = {
+        'source': 'actual-recorded-explicitly-injected-compromise',
+        'paired_seed_count': sum(pair['complete'] for pair in paired),
+        'paired_seeds': paired, 'partial_run_count': len(incomplete),
+        'infection_definition': 'Completed changed-byte cheat actions only; contact alone is not infection.',
+        'interpretation': 'Injected source containment/spread, not naturally arising compromise.'}
     return analysis, inputs
 
 

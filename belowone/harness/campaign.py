@@ -25,7 +25,8 @@ async def campaign(args):
     deadline = datetime.fromisoformat(args.deadline).timestamp()
     loop.call_later(max(0, deadline - datetime.now().timestamp()), stop.set)
     active_engine = None
-    receipts = []
+    audit_path = root / 'campaign-audit.json'
+    receipts = json.loads(audit_path.read_text())['runs'] if audit_path.is_file() else []
 
     async def ready(engine):
         nonlocal active_engine
@@ -75,6 +76,9 @@ async def campaign(args):
         complete = result is not None and not clients.meter.stop_reason
         audit = {'run': name, 'complete': complete, 'error': error or clients.meter.stop_reason,
                  'injected_compromise': injected, 'backend_pin': args.backend}
+        if folder.is_dir() and (folder / 'manifest.json').is_file():
+            import hashlib
+            audit['seal_sha256'] = hashlib.sha256((root / '.seals' / f'{name}.sha256').read_bytes()).hexdigest()
         if result is not None:
             required = ('summary.json', 'snapshots.json', 'checks.json', 'decisions.jsonl',
                         'decisions-one-line.jsonl', 'spec-interviewed.json', 'spec-one-line.json')

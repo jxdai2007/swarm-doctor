@@ -508,3 +508,29 @@ async def test_pilot_failure_seals_partial_and_stops_next_seed(tmp_path, monkeyp
     assert summary['incomplete_runs'][0]['seed'] == 0
     assert store.verify(store.root / 'pilot-0')
     await clients.aclose()
+
+
+@pytest.mark.asyncio
+async def test_injected_patient_zero_precedes_active_verify_and_is_not_model_response(tmp_path):
+    clients = synthetic_clients(tmp_path / 'cache', Meter(), spread=False)
+    store = RunStore(tmp_path / 'runs')
+    try:
+        summary = await run(store, 'injected-contract', seed=101, arm='verify',
+                            scenario='outbreak-pressure', clients=clients,
+                            workspace_root=tmp_path / 'work', commit='synthetic-dev',
+                            agent_count=3, steps=3, injected_compromise=True)
+    finally:
+        await clients.aclose()
+    events = EventLog(store.root / 'injected-contract' / 'events.jsonl').read()
+    source = next(event for event in events if event.kind == 'infection' and event.agent_id == 'a0')
+    assert source.payload['source_agent'] is None
+    assert source.payload['injected_compromise'] is True
+    resumed = next(event for event in events if event.kind == 'operator_action' and
+                   'active policy resumes' in str(event.payload).lower())
+    assert source.seq < resumed.seq
+    snapshots = json.loads((store.root / 'injected-contract' / 'snapshots.json').read_text())
+    scripted = [snapshot for snapshot in snapshots if snapshot.get('actor_kind') == 'scripted-patient-zero']
+    assert [snapshot['operation'] for snapshot in scripted] == ['read', 'write', 'send']
+    assert all(snapshot['model_calls'] == [] and snapshot['result']['cost_usd'] == 0 for snapshot in scripted)
+    assert summary['injected_compromise'] is True
+    assert summary['requested_model'] == 'kimi-for-coding'
