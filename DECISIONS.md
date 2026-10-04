@@ -72,15 +72,15 @@
 - Sealed pilot-2 failed during the primary protocol, before shadow caching: five proposed actions per agent, no completed outcome or finish, no shadow decisions/spec/checks/summary files, and cleanup kills at about 60 seconds. Primary-complete and cache-complete counts are both two, not three.
 - Both complete pilot recordings retain unsuccessful final task grading (held-out case 4 failed), zero infections and zero secondary infections. Complete recording means transport/cache completeness, not task success or proven containment. Exploratory H1/H4 effects are reported per recording without cross-stratum averaging; zero-effect pilot comparisons are inconclusive.
 
-## 2026-10-04 overnight run — known limitations (review findings recorded as limitations, not blocking P1 fixes; shipping override by Jollen)
+## 2026-10-04 overnight run — known limitations (authoritative review findings, recorded as limitations; #1 intentionally rejected refactor; all UNFIXED by shipping override)
 
-1. Experiment-module evaluator/reporting hash coupling — extraction proposal rejected: insufficient benefit against project rules; coupling documented instead.
-2. Detector generic checker/judge catch can swallow terminal quota/credit stops and may mark a shadow-cache run complete.
-3. Drift five-agent baseline can contaminate main-outbreak/H1 eligibility (drift eligibility handled separately).
-4. HTTP 402 is not stored as a replay failure / typed offline BudgetExceeded.
-5. Generic actual-group prose in doc_templates hardcodes pilot/no-infection/main-N=0 assumptions; a future infected main cohort needs the derivation generalized.
-6. Cohort-switch regenerate leaves obsolete generated owned outputs in experiments/derived.
-7. Eager optional freeze/steer probes can abort an entire capture preparation instead of skipping the beat.
-8. Default fixture capture depends on real pilots and can mislabel a real page as DEV without explicit --sources.
+1. Reporting and replay evaluator share experiments.py whole-file identity; reporting-only changes can require bounded identity refresh. Extraction deliberately NOT applied: line count/coupling insufficient benefit or project rule.
+2. Detector.check catches terminal quota/credit exceptions as generic checker/judge unavailability; terminal stop during shadow caching can yield a normal completed seal instead of incomplete.json.
+3. Five-agent drift baseline rows enter main-outbreak/H1 eligibility and denominator and can suppress the outbreak pilot fallback.
+4. OpenRouter HTTP402 raises before saving request-bound failure cassette; offline replay may CacheMiss instead of reproducing typed BudgetExceeded/shared stop.
+5. Generic actual-live cohort rendering selects a first group and hardcodes pilot calibration, zero infection/null denominators, and main N=0; future infected/main/validation groups can get false narration.
+6. regenerate overwrites current outputs without removing obsolete generated-owned paths after cohort/root switch; stale synthetic/per-run outputs can remain and fail reproduce.
+7. storyboard eagerly probes optional freeze/steer sources; absent optional source can abort preparation/all required beats instead of per-beat SKIP.
+8. Default fixture capture preparation unconditionally reads real pilots/real exploratory comparison while DEFAULT_SOURCES labels static split synthetic; missing real archive can fail fixture capture, real data can be labeled DEV.
 
-Native adapter limitation: omp native probes fail with TimeoutExpired (~30s client deadline); the study ran on the in-process experiment-harness fallback (script child exit 0 is not a native-probe PASS; exact wrapper exit unknown).
+Native adapter limitation (separate from the 8): omp native probes fail with TimeoutExpired (~30s client deadline); the study ran on the in-process experiment-harness fallback (script child exit 0 is not a native-probe PASS; exact wrapper exit unknown). Independent evidence: /tmp/compound-engineering-501/ce-code-review/20261004-111743-44c276ee/{synthesized-findings.json,validator-verdicts.json,validator-late-delta-verdicts.json}.
