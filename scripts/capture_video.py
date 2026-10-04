@@ -413,6 +413,8 @@ def main(argv=None) -> int:
                         help="archive root holding --archive-run")
     parser.add_argument("--archived-runs-note", default="pilot-0/pilot-1",
                         help="runs cited in reproduction/figure captions")
+    parser.add_argument("--receipt-arm", default="no-defense",
+                        help="arm folder of the receipt page source")
     args = parser.parse_args(argv)
     sources = None
     if args.sources:
@@ -434,7 +436,7 @@ def main(argv=None) -> int:
             stage = Path(temporary)
             urls, live_group_real = build_pages(
                 stage / "pages", args.archive_run, args.archive_root,
-                args.archived_runs_note)
+                args.archived_runs_note, args.receipt_arm)
             for name, url, seconds, kind, source in storyboard(
                     args.base, urls, sources, live_group_real,
                     args.archive_run, args.archived_runs_note):
