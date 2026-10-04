@@ -1,5 +1,6 @@
 {
   "name": "swarm-doctor",
+  "description": "Protect parallel coding agents with task locks, scope checks, and selective quarantine.",
   "owner": {
     "name": "Jollen Dai"
   },

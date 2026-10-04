@@ -7,9 +7,6 @@ The story scenes in the demo video are dramatized; every number shown comes from
 > ## Try it in 2 minutes
 >
 > In Claude Code, add this marketplace, then install the plugin:
-> **Access:** this repository is currently private. Authenticate Git with a
-> GitHub account authorized for it before adding the marketplace or cloning.
->
 >
 > ```text
 > /plugin marketplace add jxdai2007/swarm-doctor
