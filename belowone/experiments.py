@@ -597,6 +597,8 @@ def _analyze(runs_dir, recordings=None, *, labels=None, monitor_checks=None):
         key = '/'.join([config['scenario'], ','.join(config['served_models']), config['arm'],
                         'prevention' if config['prevention'] else 'no-prevention',
                         f'agents={config["agent_count"]}', f'steps={config["model_turn_budget"]}', role])
+        if config.get('injected_compromise'):
+            key += '/injected-compromise'
         grouped[key].append(run.name)
     groups, doc_metrics = {}, {}
     mean_keys = ('infected', 'clean_wrongly_frozen', 'work_completed', 'time_to_contain',
@@ -616,6 +618,9 @@ def _analyze(runs_dir, recordings=None, *, labels=None, monitor_checks=None):
                  'role': data[names[0]]['role'],
                  'provenance': {name: data[name]['provenance'] for name in names}}
         group['recorded_arm'], group['prevention'] = first['arm'], first['prevention']
+        group['injected_compromise'] = first.get('injected_compromise', False)
+        group['requested_model'] = first.get('requested_model')
+        group['backend_pin'] = first.get('backend_pin')
         for arm in ARMS:
             results = [inputs[name][0][arm] for name in names]
             aggregate = aggregate_outbreaks(results, seeds=seeds)
@@ -676,7 +681,8 @@ def _analyze(runs_dir, recordings=None, *, labels=None, monitor_checks=None):
                    for metric in (*mean_keys, 'r_mean')}
         actual_groups[key] = {**{field: group[field] for field in
                                 ('scenario', 'served_models', 'agent_count', 'model_turn_budget', 'role',
-                                 'recorded_arm', 'prevention', 'recordings', 'provenance', 'run_count')},
+                                 'recorded_arm', 'prevention', 'recordings', 'provenance', 'run_count',
+                                 'injected_compromise', 'requested_model', 'backend_pin')},
                               'source': 'actual-recorded-live-policy', 'synthetic': False,
                               'seeds': sorted(data[name]['config']['seed'] for name in names),
                               'metrics': metrics, 'r_ci95': None,
@@ -684,7 +690,9 @@ def _analyze(runs_dir, recordings=None, *, labels=None, monitor_checks=None):
         token = 'actual-' + hashlib.sha256(key.encode()).hexdigest()[:8]
         doc_metrics[token] = {**{f'metrics.{name}': value for name, value in metrics.items()},
                               **{f'meta.{field}': actual_groups[key][field] for field in
-                                 ('scenario', 'served_models', 'agent_count', 'model_turn_budget', 'role', 'source', 'synthetic')}}
+                                 ('scenario', 'served_models', 'agent_count', 'model_turn_budget', 'role', 'source', 'synthetic',
+                                  'run_count', 'recordings', 'seeds', 'recorded_arm', 'prevention',
+                                  'injected_compromise', 'requested_model', 'backend_pin')}}
     analysis['actual_live_groups'] = actual_groups
     return analysis, inputs
 
