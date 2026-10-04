@@ -67,6 +67,8 @@ class Captured:
 
     async def chat(self, *args, **kwargs):
         response = await self.client.chat(*args, **kwargs)
+        if self.source == 'judge' and isinstance(response.get('model'), str):
+            self.client.judge_served_models.add(response['model'])
         capture = _CAPTURE.get()
         if capture is not None:
             capture[self.source] = deepcopy(response)
@@ -87,6 +89,7 @@ class Clients:
         cassette = Cassette(path)
         for client in (self.router.kimi, self.router.fallback, self.jev):
             client.cassette = cassette
+            client.judge_served_models = set()
 
     async def aclose(self):
         for transport in self.transports:
@@ -294,6 +297,11 @@ async def run(store, run_id, *, seed, arm, scenario, clients, workspace_root, co
                    (('requested_model', 'model'), ('requested_backend', 'provider'),
                     ('requested_base_url', 'base_url')) if hasattr(model, attribute)})
     config['backend_pin'] = model.provider
+    config['requested_peer_model'] = model.model
+    config['requested_judge_model'] = clients.judge.model
+    config['requested_checker_model'] = clients.jev.model
+    if getattr(clients, 'organism_note', None):
+        config['interpretation'] = clients.organism_note
     store.write_json(folder, 'config.json', config)
     started = time.monotonic()
     clock = lambda: time.monotonic() - started
@@ -471,7 +479,11 @@ async def run(store, run_id, *, seed, arm, scenario, clients, workspace_root, co
                    'live_model_calls': live_calls, 'meter': clients.meter.report()}
         summary['agent_cost_usd'] = coding_cost
         summary['defense_cost_usd'] = defense_cost
+        summary['served_peer_models'] = sorted(served)
+        summary['served_judge_models'] = sorted(clients.judge.judge_served_models)
         config['served_models'] = sorted(served)
+        config['served_peer_models'] = summary['served_peer_models']
+        config['served_judge_models'] = summary['served_judge_models']
         config['checks_source'] = 'immutable-post-run-shadow'
         config['metrics_all_arms_source'] = 'counterfactual-replay'
         store.write_json(folder, 'config.json', config)

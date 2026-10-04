@@ -597,3 +597,23 @@ async def test_campaign_deadline_cancels_shielded_owned_trace_and_seals_partial(
     audit = json.loads((out / 'campaign-audit.json').read_text())
     assert audit['runs'][0]['complete'] is False
     assert audit['meter']['stop_reason'] == 'Owned campaign deadline/interruption'
+
+
+@pytest.mark.asyncio
+async def test_salvage_transport_blocks_kimi_and_closed_window(monkeypatch):
+    import httpx
+    import scripts.salvage_campaign as salvage
+    transport = salvage.GuardedTransport()
+    calls = []
+    async def no_network(request):
+        calls.append(str(request.url))
+        raise AssertionError('Forbidden network attempt')
+    monkeypatch.setattr(transport.inner, 'handle_async_request', no_network)
+    monkeypatch.setattr(salvage, 'now', lambda: salvage.START + 1)
+    async with httpx.AsyncClient(transport=transport) as http:
+        with pytest.raises(RuntimeError, match='blocked non-OpenRouter'):
+            await http.post('https://api.kimi.com/coding/v1/chat/completions')
+        transport.deadline = salvage.START
+        with pytest.raises(RuntimeError, match='window closed'):
+            await http.post('https://openrouter.ai/api/v1/chat/completions')
+    assert calls == []
