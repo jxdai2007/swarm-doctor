@@ -39,7 +39,8 @@ async def campaign(args):
         task = asyncio.create_task(run(store, name, seed=seed, arm=arm,
             scenario='outbreak-pressure', clients=clients, workspace_root=args.workspaces,
             commit=args.commit, agent_count=5, steps=20, engine_ready=ready,
-            cohort_role='validation/injected-pressure' if injected else 'validation/natural-pressure',
+            cohort_role=('validation/injected-pressure' if injected else
+                         'validation/natural-paired-pressure' if args.phase == 'paired' else 'validation/natural-pressure'),
             injected_compromise=injected))
         deadline_task = asyncio.create_task(stop.wait())
         result = None
@@ -90,6 +91,16 @@ async def campaign(args):
             audit['served_models'] = result['served_models']
             events = [json.loads(line) for line in (folder / 'events.jsonl').read_text().splitlines()]
             audit['freeze_events'] = sum(event['kind'] == 'freeze' for event in events)
+            failures = []
+            for path in (folder / 'cache').glob('*.json'):
+                response = json.loads(path.read_text())['response']
+                if response.get('_belowone_error'):
+                    failures.append({'cassette': path.name, 'kind': response['_belowone_error'],
+                                     'reason': response.get('reason')})
+            audit['recorded_model_failures'] = failures
+            if any(row['kind'] in {'quota_pending', 'rate_limit'} for row in failures):
+                audit['complete'] = False
+                audit['error'] = audit['error'] or 'Recorded provider quota/rate-limit failure; paired arm excluded'
         receipts.append(audit)
         (root / 'campaign-audit.json').write_bytes(artifact_bytes({'runs': receipts, 'meter': clients.meter.report()}))
         print(json.dumps(audit, sort_keys=True), flush=True)
@@ -102,7 +113,7 @@ async def campaign(args):
             for arm in ('no-defense', 'prompt-only', 'verify'):
                 if stop.is_set() or clients.meter.stop_reason:
                     break
-                audit = await record(args.seed, arm, True)
+                audit = await record(args.seed, arm, args.injected_compromise)
                 if not audit['complete']:
                     break
     finally:
@@ -113,6 +124,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--phase', choices=('pressure', 'paired'), required=True)
     parser.add_argument('--backend', choices=('kimi', 'openrouter'), default='kimi')
+    parser.add_argument('--injected-compromise', action='store_true')
     parser.add_argument('--seed', type=int, required=True)
     parser.add_argument('--out', required=True)
     parser.add_argument('--workspaces', required=True)
