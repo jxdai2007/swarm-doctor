@@ -275,6 +275,32 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"], "deny")
 
+    def test_grep_targets(self):
+        """Grep directory/default searches enforce never and taint"""
+        protected = {"session_id": "grep-protected", "cwd": str(self.root),
+                     "tool_name": "Grep", "tool_input": {"pattern": ".*", "path": "tests", "glob": "test_reports.py"}}
+        self.assertDecision(protected, reason="Protected by Swarm Doctor")
+        broad = {"session_id": "grep-default", "cwd": str(self.root),
+                 "tool_name": "Grep", "tool_input": {"pattern": ".*"}}
+        self.assertDecision(broad, reason="Protected by Swarm Doctor")
+        self.assertDecision(self.payload(tool="Read", path=".env.production", agent="source"))
+        self.hook(self.payload(agent="source"), kind="post")
+        (self.root / "reports/export.txt").write_text("tainted\n", encoding="utf-8")
+        reader = {"session_id": "reader", "cwd": str(self.root), "tool_name": "Grep",
+                  "tool_input": {"pattern": "tainted", "path": "reports", "glob": "*.txt"}}
+        self.assertIsNone(self.hook(reader))
+        self.hook(reader, kind="post")
+        self.assertEqual(self.state()["actors"]["reader"]["status"], "watch")
+
+    def test_sort_output_targets(self):
+        """sort output variants enforce protected writes and scope"""
+        for index, option in enumerate(("-o tests/test_reports.py", "--output tests/test_reports.py",
+                                         "--output=tests/test_reports.py", "-otests/test_reports.py")):
+            self.assertDecision(self.payload(tool="Bash", path=f"sort {option} reports/source.txt",
+                                             session=f"sort-{index}"), reason="Protected by Swarm Doctor")
+        self.assertDecision(self.payload(tool="Bash", path="sort -o README.md reports/source.txt",
+                                         session="sort-outside"), reason="Back to task")
+
     def test_launcher_missing_path(self):
         """launcher missing PATH explains prerequisite"""
         result = self.cli("swarm", "--agents", "2", "Write reports", env={**self.env, "PATH": str(self.root / "empty-bin")})

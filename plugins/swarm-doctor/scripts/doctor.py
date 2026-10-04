@@ -336,13 +336,27 @@ def shell_paths(command, cwd):
             skip = {"head": {"-n", "-c", "--lines", "--bytes"},
                     "tail": {"-n", "-c", "--lines", "--bytes"},
                     "cut": {"-d", "-f", "-b", "-c"},
-                    "sort": {"-k", "-t", "-o"}}.get(name, set())
+                    "sort": {"-k", "-t", "-o", "--output"}}.get(name, set())
             files = [arg for n, arg in enumerate(args) if not arg.startswith("-") and
                      (n == 0 or args[n - 1] not in skip)]
             if name == "find":
                 files = args[:next((n for n, arg in enumerate(args) if arg.startswith("-")), len(args))]
             for arg in files:
                 add(arg, "read")
+            if name == "sort":
+                for index, arg in enumerate(args):
+                    output = None
+                    if arg in ("-o", "--output"):
+                        if index + 1 >= len(args):
+                            raise ValueError("missing sort output path")
+                        output = args[index + 1]
+                    elif arg.startswith("--output="):
+                        output = arg.split("=", 1)[1]
+                    elif arg.startswith("-o") and len(arg) > 2:
+                        output = arg[2:]
+                    if output is not None:
+                        add(output, "write")
+                        risky = True
             if name == "find" and any(arg in ("-delete", "-exec", "-execdir") for arg in args):
                 risky = True
                 for arg in files:
@@ -386,6 +400,24 @@ def access_paths(payload, root):
         if not isinstance(command, str):
             raise ValueError("Bash command must be a string")
         raw, risky = shell_paths(command, cwd)
+    elif tool == "Grep":
+        target = data.get("path", str(cwd))
+        selector = data.get("glob", "*")
+        if not isinstance(target, str) or not isinstance(selector, str):
+            raise ValueError("Grep path and glob must be strings")
+        if any(character in selector for character in "{}"):
+            raise ValueError("Grep brace globs unsupported; use separate searches")
+        base = normalized(target, cwd)
+        raw.append((str(base), cwd, "read"))
+        if base.is_dir():
+            # Conservative: candidate reads, not regex matches; includes ignored files.
+            for directory, _, files in os.walk(base, followlinks=False):
+                for name in files:
+                    candidate = Path(directory) / name
+                    relative = candidate.relative_to(base).as_posix()
+                    if (fnmatch.fnmatchcase(name, selector) or fnmatch.fnmatchcase(relative, selector) or
+                            (selector.startswith("**/") and fnmatch.fnmatchcase(relative, selector[3:]))):
+                        raw.append((str(candidate), cwd, "read"))
     else:
         mode = "write" if tool in ("Edit", "Write", "MultiEdit", "NotebookEdit") else "read"
         for key in ("file_path", "path", "notebook_path", "pattern"):
