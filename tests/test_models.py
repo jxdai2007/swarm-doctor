@@ -385,3 +385,4 @@ async def test_openrouter_402_halts_judge_without_another_request(tmp_path):
             await KimiClient('fake', meter, Cassette(tmp_path), http=http).chat([])
     assert sent == ['openrouter.ai']
     assert meter.report()['reserved_usd'] == '0'
+

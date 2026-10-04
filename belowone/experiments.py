@@ -13,6 +13,7 @@ import re
 import socket
 import subprocess
 import tempfile
+import time
 
 import yaml
 
@@ -683,6 +684,20 @@ async def _live_study(args):
         raise ValueError('Runs and workspaces must remain outside the repository checkout')
     store = RunStore(out)
     clients = (synthetic_clients if synthetic else live_clients)(out / '_cache', meter)
+    if not synthetic:
+        used = getattr(args, 'kimi_requests_used', 0)
+        if type(used) is not int or used < 0:
+            raise ValueError('Prior Kimi request count must be a nonnegative integer')
+        # Conservatively retain all prior campaign attempts in this window;
+        # reaching the existing ceiling stops, never waits for quota reset.
+        clients.router.kimi.window.extend([time.monotonic()] * used)
+    chosen_scenario = 'outbreak'
+    pilot_report = Path(args.runs) / 'pilot-summary.json'
+    if args.command != 'pilot' and pilot_report.is_file():
+        selection = _json(pilot_report)
+        if selection.get('status') != 'complete' or selection.get('chosen_scenario') not in {'outbreak', 'outbreak-pressure'}:
+            raise RuntimeError('A complete pilot variant selection is required before paid study')
+        chosen_scenario = selection['chosen_scenario']
     rows, incomplete, reached = [], [], {}
     paid_stopped = False
 
@@ -731,6 +746,8 @@ async def _live_study(args):
                 folder, config = path.parent, _json(path)
                 if config['scenario'] != scenario or config['arm'] != 'no-defense' or config['prevention']:
                     continue
+                if config['agent_count'] != 5 or config['model_turn_budget'] != 20:
+                    continue
                 if config['synthetic'] != synthetic or (folder / 'incomplete.json').exists():
                     continue
                 if seeds is not None and config['seed'] not in seeds:
@@ -752,7 +769,7 @@ async def _live_study(args):
             if experiment == 'scale-hf-size':
                 reached[experiment] = {'status': 'cut', 'reason': 'Optional 1200-agent scale cut; actual harness maximum is five agents'}
                 continue
-            scenario = 'drift' if spec['kind'] == 'drift-replay' else 'outbreak-pressure' if experiment == 'natural-impossible-task' else 'outbreak'
+            scenario = 'drift' if spec['kind'] == 'drift-replay' else 'outbreak-pressure' if experiment == 'natural-impossible-task' else chosen_scenario
             seeds = args.seeds if args.seeds is not None else list(range(int(spec.get('seeds', 20))))
             if args.command != 'rerun' and spec['kind'] != 'live':
                 present = { _json(path / 'config.json')['seed'] for path in recordings(scenario, seeds) }
@@ -779,7 +796,7 @@ async def _live_study(args):
                 live_seeds = args.seeds if args.seeds is not None else list(range(int(spec.get('live_runs', 5))))
                 arms = ('no-defense', 'prompt-only', 'verify') if experiment == 'prompt-vs-below-one' else ('verify',)
                 variants = (False, True) if experiment == 'live-prevention' else (False,)
-                scenarios = ('outbreak', 'drift') if experiment == 'prompt-vs-below-one' else (scenario,)
+                scenarios = (chosen_scenario, 'drift') if experiment == 'prompt-vs-below-one' else (scenario,)
                 targets = [(case, arm, prevention) for case in scenarios for prevention in variants for arm in arms]
                 completed, failures = {}, []
                 for seed in live_seeds:
@@ -867,6 +884,8 @@ def main(argv=None):
         item.add_argument('--workspaces', default=str(Path(tempfile.gettempdir()) / 'belowone-live-workspaces'))
         item.add_argument('--commit', default='')
         item.add_argument('--mode', choices=('live', 'synthetic'))
+        item.add_argument('--kimi-requests-used', type=int, default=0,
+                          help='Prior campaign Kimi attempts; retain the existing request-window ceiling')
         item.add_argument('--labels')
         item.add_argument('--monitor-checks')
     args = parser.parse_args(argv)

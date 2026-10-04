@@ -9,6 +9,7 @@ from pathlib import Path
 import time
 
 import httpx
+import yaml
 
 from belowone.detect.classify import Detector
 from belowone.engine import Engine
@@ -169,7 +170,10 @@ def live_clients(cache, meter):
         raise RuntimeError('Live runs require KIMI_API_KEY and OPENROUTER_API_KEY; synthetic DEV is not live verification')
     http = httpx.AsyncClient(trust_env=False)
     cassette = Cassette(cache)
-    return Clients(KimiClient(kimi_key, meter, cassette, http=http, max_quota_wait_seconds=0),
+    settings = yaml.safe_load((ROOT.parent / 'config/default.yaml').read_text())
+    return Clients(KimiClient(kimi_key, meter, cassette, http=http, max_quota_wait_seconds=0,
+                              timeout=httpx.Timeout(settings['model_timeout_seconds'],
+                                                    read=settings['kimi']['read_timeout_seconds'])),
                    OpenRouterClient(router_key, meter, cassette, http=http),
                    JevClient(router_key, meter, cassette, http=http), synthetic=False, transports=[http])
 

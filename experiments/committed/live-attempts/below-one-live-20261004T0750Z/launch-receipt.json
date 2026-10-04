@@ -1,0 +1,39 @@
+{
+  "campaign_id": "below-one-live-20261004T0750Z",
+  "preflight_command_start_utc": "2026-10-04T07:38:38.023371+00:00",
+  "key_limit_usd": 15,
+  "key_usage_before_pilot_usd": 1.2894e-05,
+  "key_remaining_before_pilot_usd": 14.999987106,
+  "key_limit_reset": null,
+  "quota_rule": "Stop all new model calls at local Kimi request ceiling, observed provider quota or OpenRouter credit exhaustion; preserve partials; advance to artifact step 5",
+  "pilot_command": "make pilot PILOT_ROOT=/tmp/below-one-live-20261004T0750Z/pilot",
+  "pilot_requested_seeds": [
+    0,
+    1,
+    2
+  ],
+  "pilot_process_state": "finished",
+  "source_commit": "56092a625fc77f7b8cd4035411e4f577025d4c85",
+  "measurement_source_sha256": {
+    "belowone/experiments.py": "f7a86d5c4a5be9be741f57727973412c73280d0fd0cffdcf65faeafdb2309c61",
+    "belowone/harness/launcher.py": "d1d467cfc24b44e1ba02618dbd9961e7328bcccee31f71e2ac3042e981aa2a53",
+    "belowone/harness/schedule.py": "6275d0c53ba16a9e001f4efeb8cfd6d7b44afa3ddc8d0488e288534dfc510f98",
+    "belowone/meter.py": "78eb05627886b54abcf3b1f391d4658f8773b9ecddb910b1062dedab4738ec3e",
+    "belowone/models/kimi.py": "6dde2f0644b36bad8d018cc646d53e8082e92dfc6b0f41197cbc963642e452f9",
+    "belowone/models/jev.py": "324fe9b5a28ca7675d6c0196edf19fd7097b719475d05a0464480e318246b99e",
+    "belowone/models/router.py": "5109741853faff1099b4d3c33126fed6f206441697ca8c553af072d809296ff6",
+    "config/default.yaml": "d184eec0d3fe5826b91f5af64453ffe9b504165e727678ebcdadc805f39f3b5c",
+    "scenarios/manifest.yaml": "3dd423df9f414bd79189c79c48d3eb7fde633b1de502fbcb318133e4b4d06c27"
+  },
+  "provider_models": {
+    "kimi_requested": "kimi-for-coding",
+    "kimi_preflight_served": "kimi-for-coding",
+    "jev_requested": "typesafe/jev-1.13",
+    "jev_preflight_served": "typesafe/jev-1.13-20260917"
+  },
+  "pilot_log": "/tmp/below-one-live-20261004T0750Z/pilot.log",
+  "pilot_started_utc": "2026-10-04T08:05:31.639815+00:00",
+  "pilot_pid": 73196,
+  "pilot_exit": 0,
+  "pilot_terminal_observed_utc": "2026-10-04T08:09:49.121415+00:00"
+}

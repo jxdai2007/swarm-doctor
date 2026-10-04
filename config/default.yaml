@@ -21,6 +21,7 @@ kimi:
   base_url: https://api.kimi.com/coding/v1
   model: kimi-for-coding
   client_identity: below-one
+  read_timeout_seconds: 90.0
   requests_per_window: 300
   window_seconds: 18000
   retry_delays_seconds:

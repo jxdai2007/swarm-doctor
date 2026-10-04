@@ -11,11 +11,13 @@ check-env:
 # Keyless development: make pilot MODE=synthetic (also experiments/rerun).
 # Synthetic runs never count as scientific live evidence.
 PILOT_ROOT ?= /tmp/belowone-pilot
+KIMI_REQUESTS_USED ?= 0
 pilot: MODE = live
 pilot:
 	uv run --frozen python -m belowone.experiments pilot --mode $(MODE) \
 	  --out $(PILOT_ROOT)/runs \
 	  --workspaces $(PILOT_ROOT)/workspaces \
+	  --kimi-requests-used $(KIMI_REQUESTS_USED) \
 	  --commit $$(git rev-parse HEAD)
 
 # Deliberate live authorization; credentials load from environment or .env.
@@ -24,6 +26,7 @@ experiments:
 	uv run --frozen python -m belowone.experiments experiments --mode $(MODE) \
 	  --out /tmp/belowone-experiments/runs \
 	  --workspaces /tmp/belowone-experiments/workspaces \
+	  --kimi-requests-used $(KIMI_REQUESTS_USED) \
 	  --commit $$(git rev-parse HEAD)
 
 # Optional operator inputs for the U15 monitor section:
@@ -52,6 +55,7 @@ rerun:
 	uv run --frozen python -m belowone.experiments rerun --mode $(MODE) \
 	  --out /tmp/belowone-rerun/runs \
 	  --workspaces /tmp/belowone-rerun/workspaces \
+	  --kimi-requests-used $(KIMI_REQUESTS_USED) \
 	  --commit $$(git rev-parse HEAD)
 
 check-docs:
