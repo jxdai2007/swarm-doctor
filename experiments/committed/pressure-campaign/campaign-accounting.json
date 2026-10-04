@@ -59,6 +59,35 @@
         "spent_usd": "0.049402584",
         "stop_reason": null
       }
+    },
+    {
+      "phase": "injected-paired",
+      "seed": 102,
+      "backend": "kimi",
+      "source_commit": "9479799",
+      "meter": {
+        "budget_breached": false,
+        "cap_usd": "15",
+        "providers": {
+          "kimi": {
+            "calls": 680,
+            "cost_usd": "0",
+            "input_tokens": 1405138,
+            "latency": 4206.139648037497,
+            "output_tokens": 165761
+          },
+          "openrouter": {
+            "calls": 643,
+            "cost_usd": "0.049382424",
+            "input_tokens": 1175772,
+            "latency": 110.50014366302639,
+            "output_tokens": 50108
+          }
+        },
+        "reserved_usd": "0",
+        "spent_usd": "0.049382424",
+        "stop_reason": null
+      }
     }
   ],
   "probes": [
@@ -74,5 +103,5 @@
     }
   ],
   "accounting_rule": "Each phase meter is cumulative across its own arms: take only final arm meter; do not sum arm summary meters. Native key cumulative usage includes prior calls and may lag. Kimi nominal zero is not an actual billing receipt.",
-  "reported_new_campaign_openrouter_cost_usd": "0.06927575572"
+  "reported_new_campaign_openrouter_cost_usd": "0.11865817972"
 }
