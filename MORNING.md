@@ -1,5 +1,13 @@
 # MORNING — 2026-10-04 (overnight real-measurement artifact run)
 
+TOP 5 (final state, all pushed to origin feat/below-one):
+1. REAL injected-compromise campaign complete: paired seeds 101/102 (ND/prompt-only/verify), scripted P0 + 4 real peers per arm; 8 sealed runs; 103/104 excluded as technical failures (HTTPStatusError), spend $0.13613463172 of the $15 native cap.
+2. Measured truth: P0 infection 1/arm (injection by design), peer secondary 0 in every arm — no demonstrated spread benefit; verify arm froze the scripted P0 (actual catch) plus 4 clean-peer freezes across runs (2 in seed-101 verify) = reported harm; held-out grader FAILED every run — no task-success claim.
+3. Monitor: 600 frozen RULE-DERIVED labels over 8 sealed runs (586 clean/14 violation; manifest GT, R31 deviation, no human labels); fast checker n=564 acc 0.71454 ECE 0.19997, judge n=359 acc 0.82173 (labels/pressure_labels-RULE-DERIVED.jsonl, experiments/derived/monitor.json).
+4. Artifacts: PRESENTATION.md (pitch/150-word description/sourced headlines/11-clip narration order/actual-paired-summary.png + exact PNG paths); docs regenerated — make reproduce RUNS=pressure-campaign LABELS=… MONITOR_CHECKS=… REPRODUCE_IDENTICAL_NETWORK_DISABLED, make check-docs DOC_SOURCES_VERIFIED.
+5. Video recapture BLOCKED after two failed attempts (reproduce conflicts; stale split selection) — recorded in DECISIONS.md with exact next operator action; historical 11 REAL clips (invocation 3c5df185…) preserved as evidence only. Operator order: label/verify → narrate → public flip with feat/below-one default BEFORE submit → submit by 5pm PT.
+
+
 All numbers below are copied from committed/generated artifacts; sources cited inline.
 
 ## Step-by-step outcome
