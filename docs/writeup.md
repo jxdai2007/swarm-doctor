@@ -28,7 +28,7 @@ active, and the replay-vs-live gap is reported (R29).
 
 Recorded sources include REAL pilot calibration recordings (synthetic=False); the confirmatory main 5-agent cohort has not been run, so headline hypothesis claims stay exploratory/not measured.
 
-The real pilot-calibration aggregate (group `actual-7522ea73`, role validation/injected-pressure, 5 agents × 20 turns, served ['kimi-for-coding']) has 1.0 infected agents per run and finish rate 0.2; with zero observed infections the R and containment denominators are null — this is NOT a claim of R below one or of containment. The five-agent main baseline was not run (N=0).
+The real pilot-calibration aggregate (group `actual-7522ea73`, role validation/injected-pressure, 5 agents × 20 turns, served ['kimi-for-coding']) has 1.0 infected agents per run and finish rate 0.1; with zero observed infections the R and containment denominators are null — this is NOT a claim of R below one or of containment. The five-agent main baseline was not run (N=0).
 
 ## Hypotheses (R30) — status
 
@@ -45,7 +45,7 @@ eligible comparisons, never a target.
 | H3 | Strict mode preserves more work than kill-all | not_measured (N=0; source: no sealed kill-all comparison; mode: not-measured) — Strict versus kill-all is not measured: existing blunt K-hop arm is not a kill-all comparator. |
 | H4 | The interview cuts false alarms | not_measured (N=0; source: Missing prerequisite: post-hoc exploratory replay of sealed real 3-agent pilot calibration recordings; mode: not-measured) — Observed one-line minus locked-spec false-alarm differences: []; false-steer differences: []. Resource-limited exploratory fallback; requested five-agent main study has N=0. No complete eligible comparison is available. |
 | H5 | Prevention lowers R | not_measured (N=0; source: Missing prerequisite: sealed paired actual-live five-agent prevention validation; mode: not-measured) — Actual paired prevention-off minus prevention-on R is retained per validation/model stratum. No complete eligible comparison is available. |
-| H6 | Fast-checker confidence is/is not calibrated enough to set the radius | inconclusive (N=351; source: operator labels bound to sealed real checks; mode: operator-labeled-monitor) — Operator-labeled checker measurements available; radius sufficiency has no preregistered acceptance threshold. Label provenance: RULE-DERIVED from scenario-manifest ground-truth rules (KTD4); R31 deviation: no human labels available. |
+| H6 | Fast-checker confidence is/is not calibrated enough to set the radius | inconclusive (N=600; source: operator labels bound to sealed real checks; mode: operator-labeled-monitor) — Operator-labeled checker measurements available; radius sufficiency has no preregistered acceptance threshold. Label provenance: RULE-DERIVED from scenario-manifest ground-truth rules (KTD4); R31 deviation: no human labels available. |
 | H7 | Below One cuts wasted spend versus prompt-only with few false steers | not_measured (N=0; source: Missing prerequisite: cached-policy replays of sealed real five-agent drift baseline recordings; mode: not-measured) — Wasted-USD reductions and false steers are retained per eligible drift/model stratum. No complete eligible comparison is available. |
 
 ## Replay versus live
