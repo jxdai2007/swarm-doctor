@@ -16,14 +16,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
       - uses: oven-sh/setup-bun@v2
-      # omp 18.5.0 is a native Bun-compiled binary (not an npm package);
-      # install source is adapter-owner knowledge — verify identity only.
-      - name: verify installed omp identity
+      # Real omp release binary, not the unrelated npm package.
+      # Linux installation/runtime proof belongs to this CI job.
+      - name: install pinned omp 18.5.0 (checksum-verified)
         run: |
-          omp --version | grep -qx "omp/18.5.0" || {
-            echo "omp 18.5.0 not installed/pinned; install step owned by adapters/omp maintainer"
-            exit 1
-          }
+          BASE=https://github.com/can1357/oh-my-pi/releases/download/v18.5.0
+          curl --fail --location --output /tmp/omp-linux-x64 \
+            "$BASE/omp-linux-x64"
+          curl --fail --location --output /tmp/SHA256SUMS.txt \
+            "$BASE/SHA256SUMS.txt"
+          grep -E '^[[:xdigit:]]{64}  omp-linux-x64$' /tmp/SHA256SUMS.txt | (cd /tmp && sha256sum -c -)
+          install -m 0755 /tmp/omp-linux-x64 /usr/local/bin/omp
+      - name: verify installed omp identity
+        run: omp --version | grep -qx "omp/18.5.0"
       - name: offline tests
         run: |
           make test
@@ -42,7 +47,6 @@ jobs:
           tracked = subprocess.run(
               ["git", "ls-files"], capture_output=True, text=True
           ).stdout.split()
-          placeholder = re.compile(r"<[^>]+>|your[_-]|changeme", re.I)
           # direct scanner verdict, no exemptions
           hits = scan_secrets([Path(p) for p in tracked
                                if Path(p).is_file()])

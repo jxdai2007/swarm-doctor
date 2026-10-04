@@ -1,6 +1,6 @@
 # PROGRESS — Below One
 
-Durable record from session transcript facts. Synthetic/live boundary: credentials absent; all runs so far offline or mocked; no live-model scientific evidence exists yet.
+Durable record from session transcript facts. Synthetic/live boundary: no live-model scientific evidence exists yet. Historical verification and published commits are not current canonical acceptance.
 
 ## Committed (branch feat/below-one → origin)
 
@@ -14,19 +14,21 @@ Durable record from session transcript facts. Synthetic/live boundary: credentia
 
 ## Verification state
 
-- Suite state: owned-slice counts only — 130 at U2/U3/U8 verification; 196 as of the U6 c1c2ae8 commit; later focused slices (U11 12 tests, U6 25) recorded per unit. NOT a current "full suite" claim: peer-authored and in-repair tests (U10 eval under engine-integration) are excluded until each unit is canonical.
+- Historical owned-slice counts: 130 at U2/U3/U8 verification; 196 at U6 c1c2ae8; later focused U11/U6 slices recorded per unit. These pre-remediation counts are not current fullsuite evidence. Current nine-leaf focused verification is recorded by the remediation coordinator.
 - Leaf gate ledgers `.unlazy/below-one/gates/leaf-U{2,3,8}.md`: G1 checked with automatic-evidence v1 hashes (exit 0). Root GATES G1 evidence reverted to PENDING: runnable gates pass only on actual runner-executed automatic-evidence; witnessed facts stay narrative, never gate evidence.
-- Root GATES.md: G1..G6 pending.
-- Dispatch `.unlazy/below-one/dispatch.json`: wave ready-1 complete (leases U2/U3/U8 released, PLAN states VERIFIED); waves eval-repair + u7-integration dispatched to engine-integration; u11-ops held by ops-presentation.
+- Root GATES.md: G1..G9 pending; scientific/operator G5/G6 remain unmet regardless of source verification.
+- Original `.unlazy/below-one/dispatch.json` records historical waves, not active source leases. Current authority is `.unlazy/review-remediation/CONTRACT.md`, PLAN.md and coordinator ledgers: all nine source leaves are VERIFIED and their exact leases released; postwave ops reconciliation awaits coordinator checks.
 
-## Implementation status (per unit, honest split)
+## Current implementation and integration status
 
-- Canonical: U1 fb721e1, U2 c8378dd, U3 a6b7116, U8 7887d6e, U4 08898bb, U10 core (5c99d2d/7850766/12e9d36 + repair 878f11f — PREPARED, completion gated on U9 pilot all-arm offline metric files), U5 4e8b145, U6 f496ca4 + c1c2ae8 + 11718b1/2d16af1, U7 3853e66 (engine facade + HTTP API; /start claim protocol in DECISIONS), U11 dd1ce57, U14/U15 sources ae1b556 + 44cc1de + 4df78e4 + 07e54e9 (PREPARED — completion needs real U9 artifacts + operator labels).
-- U13: dashboard/retained-replay render consistency + engine-server capture committed 907e0ec/aa06739; actual browser proof + clips under .impeccable/review/ and clips/ (SYNTHETIC DEV); completion awaits director source-ready + real data.
-- In repair by engine-integration: eval provenance-extractor (public canonical helper, replay+arms); U9 harness authored after canonical U7.
-- U11: implemented + repaired per director defect list, unit-ready receipt v2 sent, commit HELD awaiting director inspection (sources uncommitted: belowone/spec/interview.py, belowone/cli.py, tests/test_interview.py).
-- Not implemented: U7, U9, U12 (good integration workstream); U13-U17 presentation authored-but-held or unstarted, gated on U9/U10; U13 capture must use actual fixture/pilot clips with browser desktop/mobile visual proof, fixture vs live honestly labeled.
-- Live/operator gates: U12 live three-Kimi-agent verification, U15 operator labels, U16 real study, U17 final submission — blocked on operator items in OPERATOR_TODO.md. Synthetic DEV artifacts labeled; no hypothesis measured from synthetic runs.
+- Accepted source remediation landed across engine/causal graph, harness, authenticated API/client, native runtime, grader, dashboard, figures, authored-doc/capture pipeline and interview validation. Nine source leaves are coordinator-VERIFIED; root acceptance remains pending.
+- API clean cutover requires launch-issued `agent_tokens` in `create_app`, `agent_token` in `EngineClient`, and awaited `Engine.start`. Native children receive only their own agent capability; operator capability remains separate. Scoped authored-source inventory found no unexpected caller paths or obsolete signature consumers.
+- FILE claims retain an asynchronous lease through effects settlement, including failed observed/possible writes and cancellation. Cheap state/proposal metadata replaces journal polling; causal reconciliation retains late versions and alternative forwarding paths.
+- Native freeze preserves conversation for release; kill terminates tool process groups. Ordinary reads delegate to the original builtin; protected/unsupported selectors fail closed. Grader default 54s = 22 cases × 2s + 10s startup; local-test 10s independent; native finish transport 59s, other transport 30s.
+- Ops source: study targets pass explicit mode with `MODE=live` default and keyless `MODE=synthetic` override; demo uses `uv run --frozen --env-file .env`. CI verifies the real can1357/oh-my-pi v18.5.0 Linux release checksum before execution and requires `omp/18.5.0`; scanner directly enforces every verdict, including `.example` files. Dead placeholder regex removed. Release metadata and checksum inspected; Linux installation/runtime remains unexercised locally and CI-pending.
+- Existing ops commits 207e0ed and prematurely published ff13462 remain intact. No new commit/push, branch rewrite, archive edits/reseals or paid/live calls authorized. Their publication does not mean shipping.
+- Coordinator/parent pending: exact CI scanner heredoc and focused ops controls; one canonical fullsuite; separate check-env; fresh-clone keyless test/reproduce; current derived/authored regeneration; current-source full eleven-beat capture with current inventory; final document/link checks. Frozen `experiments/committed/runs` and `experiments/display` remain outside generation targets.
+- Live/operator gates remain unmet: provider credentials and spend approval, real three-agent native pilot/study recordings, live setup interview, trusted operator monitor labels/check exports, scientific hypothesis evidence, narration/assembly, public repository flip and final submission. Synthetic fixtures and historical clips cannot satisfy these outcomes.
 
 ## Blocked (operator-only)
 

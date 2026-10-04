@@ -7,17 +7,18 @@ test:
 check-env:
 	uv run --frozen python scripts/first_hour_checks.py
 
-# Live gate by contract (finding #2): explicit --mode $(MODE), MODE defaults
-# to live like experiments/rerun; keyless development callers MUST override
-# explicitly with MODE=synthetic (never silent paid action).
+# Study targets deliberately authorize live mode by default.
+# Keyless development: make pilot MODE=synthetic (also experiments/rerun).
+# Synthetic runs never count as scientific live evidence.
+PILOT_ROOT ?= /tmp/belowone-pilot
 pilot: MODE = live
 pilot:
 	uv run --frozen python -m belowone.experiments pilot --mode $(MODE) \
-	  --out /tmp/belowone-pilot/runs \
-	  --workspaces /tmp/belowone-pilot/workspaces \
+	  --out $(PILOT_ROOT)/runs \
+	  --workspaces $(PILOT_ROOT)/workspaces \
 	  --commit $$(git rev-parse HEAD)
 
-# Deliberate live authorization: explicit --mode live, keys from .env.
+# Deliberate live authorization; credentials load from environment or .env.
 experiments: MODE = live
 experiments:
 	uv run --frozen python -m belowone.experiments experiments --mode $(MODE) \
