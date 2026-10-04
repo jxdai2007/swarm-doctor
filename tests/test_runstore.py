@@ -34,7 +34,7 @@ def test_complete_run_layout_and_manifest(tmp_path):
         store.write_json(run, 'metrics/result.json', {})
 
 
-@pytest.mark.parametrize('change', ['edit', 'append', 'remove', 'add', 'empty_dir', 'remove_dir', 'manifest', 'recomputed_manifest'])
+@pytest.mark.parametrize('change', ['edit', 'append', 'remove', 'add', 'empty_dir', 'manifest', 'recomputed_manifest'])
 def test_any_sealed_byte_or_inventory_change_fails(tmp_path, change):
     store, run = sample_run(tmp_path)
     store.seal(run)
@@ -50,8 +50,6 @@ def test_any_sealed_byte_or_inventory_change_fails(tmp_path, change):
         (run / 'extra.txt').write_text('extra')
     elif change == 'empty_dir':
         (run / 'extra').mkdir()
-    elif change == 'remove_dir':
-        (run / 'figures').rmdir()
     elif change == 'manifest':
         with (run / 'manifest.json').open('ab') as stream:
             stream.write(b' ')
@@ -60,6 +58,18 @@ def test_any_sealed_byte_or_inventory_change_fails(tmp_path, change):
         manifest = json.loads((run / 'manifest.json').read_text())
         manifest['files']['metrics/result.json'] = hashlib.sha256(b'changed').hexdigest()
         (run / 'manifest.json').write_text(json.dumps(manifest, sort_keys=True, separators=(',', ':')) + '\n')
+    assert not store.verify(run)
+
+
+def test_removed_empty_declared_dir_and_undeclared_dir_semantics(tmp_path):
+    # C23: an absent declared directory is transport-tolerated (git drops empty
+    # dirs) only because the files inventory is exact; an undeclared directory
+    # is still tamper.
+    store, run = sample_run(tmp_path)
+    store.seal(run)
+    (run / 'figures').rmdir()
+    assert store.verify(run)
+    (run / 'undeclared').mkdir()
     assert not store.verify(run)
 
 

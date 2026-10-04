@@ -279,3 +279,50 @@ def test_historical_delayed_failed_write_reconstructs_same_engine_and_graph(tmp_
     assert reconstructed.graph.snapshot() == graph.snapshot()
     assert reconstructed.graph.contacts('a0')[0]['seq'] == read.seq
     assert reconstructed.graph.reads[0]['write_seq'] == write.seq
+
+
+def _sealed_run(tmp_path):
+    import json
+    from belowone.runstore import RunStore
+    run = tmp_path / 'runs' / 'pilot-0'
+    (run / 'cache').mkdir(parents=True)
+    (run / 'figures').mkdir()
+    (run / 'manifests').mkdir()
+    (run / 'metrics').mkdir()
+    (run / 'config.json').write_text('{"seed": 0}')
+    (run / 'cache' / 'a.json').write_text('{}')
+    store = RunStore(run.parent)
+    store.seal(run)
+    return store, run, json
+
+
+def test_seal_verification_tolerates_git_untransportable_empty_dirs(tmp_path):
+    import shutil
+    from belowone.runstore import RunStore
+    store, run, json = _sealed_run(tmp_path)
+    clone = tmp_path / 'clone' / 'pilot-0'
+    shutil.copytree(run, clone)
+    for name in ('figures', 'manifests'):
+        shutil.rmtree(clone / name)  # git transport drops empty directories
+    (clone.parent / '.seals').mkdir()
+    shutil.copy(run.parent / '.seals' / 'pilot-0.sha256', clone.parent / '.seals' / 'pilot-0.sha256')
+    assert RunStore(clone.parent).verify(clone) is True
+
+
+def test_seal_verification_rejects_extra_payload_in_declared_dir(tmp_path):
+    store, run, json = _sealed_run(tmp_path)
+    (run / 'figures' / 'extra.svg').write_text('<svg/>')
+    assert store.verify(run) is False
+
+
+def test_seal_verification_rejects_missing_payload_file(tmp_path):
+    store, run, json = _sealed_run(tmp_path)
+    (run / 'cache' / 'a.json').unlink()
+    assert store.verify(run) is False
+
+
+def test_seal_verification_rejects_symlinked_declared_dir(tmp_path):
+    store, run, json = _sealed_run(tmp_path)
+    (run / 'figures').rmdir()
+    (run / 'figures').symlink_to(tmp_path)
+    assert store.verify(run) is False

@@ -162,6 +162,20 @@ class RunStore:
                     return False
                 # Parsing also rejects malformed JSON; compare exact serialized inventory.
                 manifest = json.loads(content)
-                return manifest == self._inventory(run) and content == _canonical_bytes(manifest)
+                inventory = self._inventory(run)
+                if manifest['files'] != inventory['files']:
+                    return False
+                # Empty declared directories cannot survive git transport: validate
+                # a declared directory only when it physically exists (absence is
+                # valid because no payload key can live under an empty dir).
+                for name in manifest['directories']:
+                    path = run / name
+                    if not path.exists():
+                        continue
+                    if not path.is_dir() or path.is_symlink() or scrub(name) != name:
+                        return False
+                if not set(inventory['directories']) <= set(manifest['directories']):
+                    return False
+                return content == _canonical_bytes(manifest)
         except (OSError, ValueError, TypeError):
             return False
