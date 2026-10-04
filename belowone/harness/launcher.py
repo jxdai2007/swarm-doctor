@@ -297,6 +297,7 @@ async def run(store, run_id, *, seed, arm, scenario, clients, workspace_root, co
                    (('requested_model', 'model'), ('requested_backend', 'provider'),
                     ('requested_base_url', 'base_url')) if hasattr(model, attribute)})
     config['backend_pin'] = model.provider
+    config['actor_response_format'] = {'type': 'json_object'} if getattr(model, 'json_object', False) else None
     config['requested_peer_model'] = model.model
     config['requested_judge_model'] = clients.judge.model
     config['requested_checker_model'] = clients.jev.model

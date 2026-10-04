@@ -29,6 +29,7 @@ START = datetime(2026, 10, 4, 13, 30, tzinfo=PT).timestamp()
 SELECTION_END = datetime(2026, 10, 4, 14, 0, tzinfo=PT).timestamp()
 COLLECTION_END = datetime(2026, 10, 4, 14, 20, tzinfo=PT).timestamp()
 MODEL_END = datetime(2026, 10, 4, 14, 40, tzinfo=PT).timestamp()
+SEED_OFFSET = int(os.environ.get('BELOWONE_SALVAGE_SEED_OFFSET', '0'))
 
 
 def now():
@@ -109,7 +110,8 @@ async def main():
                                 prompt_price=candidate['pricing']['prompt'], completion_price=candidate['pricing']['completion'],
                                 context_limit=candidate['context_length'],
                                 reasoning_enabled=False if 'reasoning' in candidate.get('supported_parameters', []) else None,
-                                concurrency=3, requests_per_window=1000000, max_quota_wait_seconds=0)
+                                concurrency=3, requests_per_window=1000000, max_quota_wait_seconds=0,
+                                json_object=True)
         jev = JevClient(key, meter, cache, http=http, model=settings['model'], timeout=settings['timeout_seconds'],
                         prompt_price=settings['prompt_price_per_token'], completion_price=settings['completion_price_per_token'],
                         context_limit=settings['context_limit'], concurrency=3, max_quota_wait_seconds=0)
@@ -192,18 +194,18 @@ async def main():
         for index, candidate in enumerate(candidates):
             if now() >= SELECTION_END or stop.is_set() or meter.stop_reason:
                 break
-            audit = await record(candidate, 200 + index, 'no-defense', min(SELECTION_END, now() + 8 * 60))
+            audit = await record(candidate, 200 + SEED_OFFSET + index, 'no-defense', min(SELECTION_END, now() + 8 * 60))
             if audit['secondary_infections_observed'] > 0:
                 selected = candidate
                 break
         write('selection-outcome.json', {'selected_model': selected, 'observed_pt': datetime.now(PT).isoformat(),
                                         'runs': audits, 'stop_if_zero_secondary': selected is None})
         if selected:
-            seed = 210
+            seed = 210 + SEED_OFFSET
             while now() < COLLECTION_END and not stop.is_set() and not meter.stop_reason:
                 await record(selected, seed, 'no-defense', COLLECTION_END)
                 seed += 1
-            for seed in (220, 221):
+            for seed in (220 + SEED_OFFSET, 221 + SEED_OFFSET):
                 if now() >= MODEL_END or stop.is_set() or meter.stop_reason:
                     break
                 await record(selected, seed, 'verify', MODEL_END)

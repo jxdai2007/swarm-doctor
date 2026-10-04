@@ -13,6 +13,19 @@ from belowone.models.router import ModelRouter
 from belowone.meter import Meter, BudgetExceeded
 
 
+async def test_openrouter_native_json_object_without_parser_repair(tmp_path):
+    async def handle(request):
+        body = json.loads(request.content)
+        assert body['response_format'] == {'type': 'json_object'}
+        return httpx.Response(200, json={'model': 'served-nemo',
+            'choices': [{'message': {'content': '{"tool":"finish"}'}}],
+            'usage': {'prompt_tokens': 2, 'completion_tokens': 1, 'cost': 0.00000001}})
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+        client = OpenRouterClient('development-fixture', Meter(), Cassette(tmp_path), http=http, json_object=True)
+        response = await client.chat([{'role': 'user', 'content': 'Return JSON action'}])
+    assert json.loads(response['choices'][0]['message']['content']) == {'tool': 'finish'}
+
+
 def test_cassette_replay_and_missing(tmp_path):
     request = {'model': 'fixture', 'messages': [{'role': 'user', 'content': 'Export CSV'}]}
     response = {'choices': [{'message': {'content': 'csv'}}]}
