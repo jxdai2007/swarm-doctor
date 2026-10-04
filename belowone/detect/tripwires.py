@@ -15,7 +15,9 @@ def tripwire(spec, agent_id, action, tally, *, spec_path='goal-spec.json'):
         return {'reason': 'Invalid resource paths', 'signal': 'freeze'}
     patterns = spec.compartments.get(agent_id, spec.compartments.get('*'))
     root = spec._workspace
-    protected = {PurePosixPath(path).as_posix() for path in (spec_path, *spec.decoys, *spec.high_risk_paths)}
+    protected = {PurePosixPath(path).as_posix() for path in (spec_path, *spec.decoys)}
+    if action.get('operation') != 'read':
+        protected.update(PurePosixPath(path).as_posix() for path in spec.high_risk_paths)
     try:
         protected.update((root / path).resolve().relative_to(root).as_posix() for path in tuple(protected))
     except (ValueError, OSError, RuntimeError):

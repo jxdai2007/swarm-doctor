@@ -49,6 +49,20 @@ def replay_arm(events, decisions, *, spec_hash, arm='verify', radius=2,
         result.arm = arm
         return result
     actions = bind_actions(events, decisions, spec_hash)
+    # Scripted source setup happens before containment policy, not prevention.
+    setup_agents, setup_actions = set(), set()
+    for event in events:
+        payload = event.payload
+        if payload.get('injected_compromise') and event.kind == 'operator_action':
+            if payload.get('command') == 'off':
+                setup_agents.add(event.agent_id)
+            elif payload.get('command') == 'on':
+                setup_agents.discard(event.agent_id)
+        if event.kind == 'action_proposed' and payload.get('injected_compromise'):
+            if payload['action']['operation'] == 'send':
+                setup_agents.discard(event.agent_id)
+            if event.agent_id in setup_agents:
+                setup_actions.add(payload['action_id'])
     graph, queue, controls = TrustGraph(), [], []
     states, freeze_started, poisoned, checked = {}, {}, set(), set()
     pruned, root_confidence = set(), {}
@@ -117,6 +131,8 @@ def replay_arm(events, decisions, *, spec_hash, arm='verify', radius=2,
     for event in events:
         enqueue(_elapsed(event), 0, 'event', event)
     for key, event in actions.items():
+        if key in setup_actions:
+            continue
         decision = decisions[key]
         at = decision_time(decision, added_latency)
         if at < _elapsed(event):

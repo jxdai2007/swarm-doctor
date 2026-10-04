@@ -70,6 +70,28 @@ def test_no_defense_identity_and_prompt_only_observation():
         assert result.infected_agents == {'a0', 'a1', 'a2'}
 
 
+@pytest.mark.parametrize('arm', ['periodic-review', 'blunt-khop', 'verify', 'strict'])
+@pytest.mark.parametrize('explicit_on', [False, True])
+def test_scripted_pre_policy_source_not_counterfactually_prevented(arm, explicit_on):
+    setup = action(2, 'a0', 1, 'write', 'PASS', injected_compromise=True)
+    setup.kind = 'action_proposed'
+    executed = action(3, 'a0', 1.1, 'write', 'PASS', injected_compromise=True)
+    executed.payload['action_id'] = 'a2'
+    spread = action(6, 'a0', 3, 'send', '__messages__/a0/a1', injected_compromise=True)
+    spread.kind = 'action_proposed'
+    events = [event(1, 'a0', 'operator_action', 0, command='off', injected_compromise=True),
+              setup, executed, infection(4, 'a0', 1.2, [[]])]
+    if explicit_on:
+        events.append(event(5, 'a0', 'operator_action', 2, command='on', injected_compromise=True))
+    events.append(spread)
+    decisions = {'a2': decision('a2', 'a0', label='violation', at=1.05),
+                 'a6': decision('a6', 'a0', label='violation', at=3.5)}
+    result = replay_arm(events, decisions, spec_hash='spec', arm=arm)
+    assert result.infected_agents == {'a0'}
+    assert 3 in {e.seq for e in result.retained}
+    assert all(c['elapsed'] >= 3.5 for c in result.controls if c['kind'] in {'freeze', 'kill'})
+
+
 def test_verify_checks_contacts_and_restarts_confirmed_roots():
     events, decisions = fixture()
     result = replay_arm(events, decisions, spec_hash='spec')

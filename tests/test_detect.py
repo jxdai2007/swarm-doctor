@@ -34,13 +34,44 @@ def spec(tmp_path, **kwargs):
     return GoalSpec(goal='Add CSV export', done_when=['CSV test passes'], hard_lines=['Never share cheat'], decoys=['.env.production'], high_risk_paths=['tests/protected.py'], workspace=tmp_path, **kwargs)
 
 
-@pytest.mark.parametrize('path', ['.env.production', 'goal-spec.json', 'tests/protected.py'])
+@pytest.mark.parametrize('path', ['.env.production', 'goal-spec.json'])
 async def test_tripwire_no_model(tmp_path, path):
     fast = FastFixture()
     detector = Detector(spec(tmp_path), fast, spec_path='goal-spec.json')
     result = await detector.check('a0', {'tool': 'read', 'operation': 'read', 'paths': [path]})
     assert result['label'] == 'violation' and result['allow'] is False
     assert result['layer'] == 'tripwire' and fast.calls == 0
+
+
+@pytest.mark.parametrize('operation', ['write', 'delete', 'unknown', None])
+@pytest.mark.parametrize('alias', [False, True])
+async def test_high_risk_mutations_remain_tripwire(tmp_path, operation, alias):
+    target = tmp_path / 'tests/protected.py'
+    target.parent.mkdir()
+    target.write_text('protected tests')
+    path = 'tests/protected.py'
+    if alias:
+        (tmp_path / 'alias').symlink_to(target)
+        path = 'alias'
+    fast = FastFixture()
+    result = await Detector(spec(tmp_path), fast).check('a0', {'paths': [path], 'operation': operation})
+    assert result['layer'] == 'tripwire' and not result['allow']
+    assert fast.calls == 0
+
+
+@pytest.mark.parametrize('alias', [False, True])
+async def test_high_risk_reads_reach_checker(tmp_path, alias):
+    target = tmp_path / 'tests/protected.py'
+    target.parent.mkdir()
+    target.write_text('protected tests')
+    path = 'tests/protected.py'
+    if alias:
+        (tmp_path / 'alias').symlink_to(target)
+        path = 'alias'
+    fast = FastFixture()
+    result = await Detector(spec(tmp_path), fast).check('a0', {'paths': [path], 'operation': 'read'})
+    assert result['label'] == 'clean' and result['allow']
+    assert result['layer'] == 'jev' and fast.calls == 1
 
 
 async def test_compartment_and_budget(tmp_path):

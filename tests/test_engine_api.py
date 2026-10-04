@@ -36,6 +36,30 @@ async def test_real_detector_decision_record_and_tripwire(tmp_path):
         engine.record('a0', proposal, {'ok': True}, decision_id=answer['decision_id'])
 
 
+async def test_high_risk_read_executes_and_write_freezes_actual_engine(tmp_path):
+    from belowone.harness.tools import Tools
+    target = tmp_path / 'tests/protected.py'
+    target.parent.mkdir()
+    target.write_text('protected tests\n')
+    locked = GoalSpec(goal='Inspect tests', done_when=['tests inspected'],
+                      high_risk_paths=['tests/protected.py'], workspace=tmp_path)
+    fast = FastFixture()
+    engine = Engine(locked, EventLog(tmp_path / 'events.jsonl'), Detector(locked, fast),
+                    agent_ids=('a0', 'a1'), clock=lambda: 1.0)
+    read = action('read', 'tests/protected.py')
+    read['input'] = {'path': 'tests/protected.py'}
+    answer = await engine.decide('a0', read)
+    assert answer['allow'] and fast.calls == 1
+    assert (await engine.start('a0', answer['decision_id']))['allow']
+    result = await Tools(tmp_path).execute(read)
+    assert result['ok'] and 'protected tests' in result['content']
+    event = engine.record('a0', read, result, decision_id=answer['decision_id'])
+    assert event.kind == 'action_executed'
+    denied = await engine.decide('a1', action('write', 'tests/protected.py'))
+    assert not denied['allow'] and denied['state'] == 'frozen'
+    assert fast.calls == 1 and target.read_text() == 'protected tests\n'
+
+
 from contextlib import asynccontextmanager
 import asyncio
 import json
