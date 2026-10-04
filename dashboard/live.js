@@ -128,7 +128,14 @@ function applySnapshot(snap) {
   latestSeq = seq;
   snap = normalizeSnapshot(snap);
   for (const ev of [...(snap.events || []), ...(snap.controls || [])]) retain(ev);
-  document.getElementById("synthetic-badge").classList.toggle("on", !!snap.synthetic);
+  const badge = document.getElementById("synthetic-badge");
+  const historical = params.get("run");
+  badge.textContent = snap.synthetic
+    ? "SYNTHETIC DEV — fixture replay, not live evidence"
+    : historical?.startsWith("injected-kimi-") && historical.endsWith("-verify")
+      ? "HISTORICAL KIMI — original READ-freeze bug retained; not the posthoc fixed policy"
+      : historical ? "ARCHIVED RECORDING — not a live intervention" : "";
+  badge.classList.toggle("on", !!snap.synthetic || !!historical);
   const els = [];
   for (const n of (snap.nodeEls || [])) {
     const id = n.data.id;

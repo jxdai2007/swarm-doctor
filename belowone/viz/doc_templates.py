@@ -290,7 +290,15 @@ def _provenance_tokens(metrics: dict) -> dict:
             "matched n359 Jev0.785515 versus judge0.821727. These are rule "
             "agreement, not human accuracy; historical frozen85 report unchanged. "
             "Cached-policy replay reevaluates scripted setup and may prevent "
-            "P0; it is not this actual already-compromised comparison.")
+            "P0; it is not this actual already-compromised comparison. Step A "
+            "correction: a post-hoc, same-recording fixed-policy replay of the "
+            "sealed verify runs removes the six protected-test READ freezes "
+            "(clean peers 6→0; replay source-freeze unchanged at 4.3808s/3.9902s; "
+            "actual 9.259s/5.435s is a separate recorded reference). Removed "
+            "READs become uncertain fail-closed denies (no cached checker "
+            "responses), not restored work — see "
+            "experiments/committed/salvage-campaign/step-a.json and "
+            "presentation/figures/step-a-protected-read-before-after.png.")
         out["results.failed.note"] = (
             "All six actual paired graders failed; no secondary-spread benefit "
             "was demonstrated and six clean peers were frozen. Same provider "
@@ -487,8 +495,11 @@ artifact reproduction.
 ## Measured results
 
 See [docs/generated/README-metrics.md](docs/generated/README-metrics.md).
-Every number there regenerates offline from committed run artifacts with
-`make reproduce RUNS=experiments/committed/pressure-campaign LABELS=labels/pressure_labels-RULE-DERIVED.jsonl MONITOR_CHECKS=experiments/derived/monitor-checks.json OUTPUTS=experiments/derived` — no network, no API keys. {results.provenance.note}
+Historical numbers remain bound to immutable committed recordings. Pressure-wide
+reproduction currently has unadmitted replay-semantic differences after the
+pre-policy source correction; it is not promised as passing. The exercised,
+network-disabled salvage proof is `python -m scripts.salvage_report --check`.
+{results.provenance.note}
 
 {results.actual.note}
 
@@ -508,13 +519,13 @@ Every number there regenerates offline from committed run artifacts with
 ## Reproduce
 
 ```bash
-# Canonical final pressure cohort; plain make reproduce defaults to old live-runs.
-make reproduce RUNS=experiments/committed/pressure-campaign LABELS=labels/pressure_labels-RULE-DERIVED.jsonl MONITOR_CHECKS=experiments/derived/monitor-checks.json OUTPUTS=experiments/derived
-make check-docs
-# After an intentional source/template change:
-make regenerate RUNS=experiments/committed/pressure-campaign LABELS=labels/pressure_labels-RULE-DERIVED.jsonl MONITOR_CHECKS=experiments/derived/monitor-checks.json
-# Repeat the explicit reproduce command above.
+# Actual-only salvage proof; no keys or cached organism-policy replay.
+/tmp/below-one-live-20261004T0750Z/venv/bin/python -m scripts.salvage_report --check
+/tmp/below-one-live-20261004T0750Z/venv/bin/python scripts/check_doc_numbers.py --metrics-glob /Users/jollenshoulddai/Desktop/below-one/experiments/derived/analysis.json
+# Historical pressure-wide regeneration/admission is intentionally unchanged.
 ```
+
+The document check uses the existing Desktop-derived historical source. Its default source is ignored by Git and absent from a fresh clone; this is not a portable default-command claim.
 """,
     'docs/writeup.md': """\
 # Write-up
@@ -671,10 +682,11 @@ target: ~120s.
 
 {results.actual.note}
 
-Canonical offline proof uses the explicit current cohort:
-`make reproduce RUNS=experiments/committed/pressure-campaign LABELS=labels/pressure_labels-RULE-DERIVED.jsonl MONITOR_CHECKS=experiments/derived/monitor-checks.json OUTPUTS=experiments/derived`.
-`make check-docs` checks source-bound generated/authored documents. Plain
-Makefile defaults still select the old live-runs root.
+Current exercised offline proof is actual-only salvage:
+`python -m scripts.salvage_report --check`; no organism policy replay.
+`make check-docs` checks source-bound generated/authored historical documents.
+Pressure-wide reproduction has unadmitted replay-semantic differences and is
+not promised as passing after the pre-policy source correction.
 
 | # | Beat | Dur | Clip (exists) | On-screen | Narration (facts exercised in this repo) |
 |---|---|---|---|---|---|
