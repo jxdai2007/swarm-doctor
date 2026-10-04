@@ -11,7 +11,7 @@
 
 ## Other recorded groups (per group, never averaged across served models)
 
-### actual-d2a888ac (served_models=['kimi-for-coding']; scenario=outbreak; synthetic=False; agent_count=3; role=pilot-calibration)
+### actual-d2a888ac (served_models=['kimi-for-coding']; scenario=outbreak; recorded_arm=no-defense; synthetic=False; agent_count=3; role=pilot-calibration)
 
 - metrics.infected: 0.00
 - metrics.r_mean: unmeasured
