@@ -71,6 +71,7 @@ def load_actions(runs_root: Path, run: str) -> dict[str, dict]:
                             or e.get("seq"))
             rec = actions.setdefault(action_id, {
                 "action_id": action_id, "agent_id": e.get("agent_id"),
+                "seq": e.get("seq"),
                 "kinds": [], "action": action})
             rec["kinds"].append(e["kind"])
             if e["kind"] == "action_executed":
@@ -145,11 +146,21 @@ def main(argv=None) -> int:
     parser.add_argument("--all", action="store_true",
                         help="label every deduped action in --runs (distinct "
                              "IDs), not just the frozen sample rows")
+    parser.add_argument("--exclude-runs", default="",
+                        help="comma-separated run IDs to omit (e.g. runs "
+                             "whose HTTP-failed actions lack checker "
+                             "records and cannot bind the monitor export)")
+    parser.add_argument("--include-incomplete", action="store_true",
+                        help="also label runs the campaign audit marks "
+                             "complete:false (sidecar/forensic use)")
     args = parser.parse_args(argv)
     sha = manifest_sha()
+    excluded = {r for r in args.exclude_runs.split(",") if r}
     if args.all:
         rows = []
         for run_dir in sorted(Path(args.runs_root).iterdir()):
+            if run_dir.name in excluded:
+                continue
             config = run_dir / "config.json"
             if run_dir.name.startswith(".") or not config.is_file():
                 continue
@@ -157,15 +168,15 @@ def main(argv=None) -> int:
                     run_dir.parent / ".seals" / f"{run_dir.name}.sha256").exists():
                 continue  # only complete sealed runs are label-eligible
             audit = run_dir.parent / "campaign-audit.json"
-            if audit.is_file():
+            if args.include_incomplete is False and audit.is_file():
                 entry = next((r for r in json.loads(audit.read_text())["runs"]
                               if r.get("run") == run_dir.name), None)
                 if entry and entry.get("complete") is False:
                     continue  # campaign gate: terminal-swallowed normal seals
-            for action_id in load_actions(run_dir.parent, run_dir.name):
-                event_id = action_id if action_id.startswith(
-                    run_dir.name + ":") else f"{run_dir.name}:{action_id}"
-                rows.append({"event_id": event_id, "action_id": action_id})
+            for action_id, rec in load_actions(
+                    run_dir.parent, run_dir.name).items():
+                rows.append({"event_id": f"{run_dir.name}:{rec['seq']}",
+                             "action_id": action_id})
     else:
         rows = [json.loads(l) for l in Path(args.sample).open() if l.strip()]
     cache: dict[str, tuple[dict, dict, dict, dict]] = {}
