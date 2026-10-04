@@ -29,6 +29,10 @@ jobs:
           install -m 0755 /tmp/omp-linux-x64 /usr/local/bin/omp
       - name: verify installed omp identity
         run: omp --version | grep -qx "omp/18.5.0"
+      # Browser binary for the dashboard regression suite; downloaded while the
+      # runner still has network, version pinned by uv.lock (playwright 1.51.0).
+      - name: install pinned playwright chromium
+        run: uv run --frozen playwright install --with-deps chromium chromium-headless-shell
       - name: offline tests
         run: |
           make test
