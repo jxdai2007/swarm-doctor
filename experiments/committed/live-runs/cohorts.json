@@ -1,0 +1,71 @@
+{
+  "actual_live_validation": {
+    "completed_runs": [],
+    "requested_seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "status": "not_started"
+  },
+  "main_baseline": {
+    "completed_runs": [],
+    "reason": "Local Kimi request-window ceiling reached before a complete three-seed pilot; no variant selected",
+    "requested_agent_count": 5,
+    "requested_seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19
+    ],
+    "status": "not_started"
+  },
+  "pilot": {
+    "agent_count": 3,
+    "chosen_scenario": null,
+    "complete_seeds": [
+      0,
+      1
+    ],
+    "incomplete_seeds": [
+      2
+    ],
+    "requested_seeds": [
+      0,
+      1,
+      2
+    ]
+  },
+  "runs": {
+    "pilot-0": {
+      "role": "pilot-calibration",
+      "seal_sha256": "f1a01dd47eb4b6db17af749035c29d96875fdeef6bd36c9a56e9942f59618a5e"
+    },
+    "pilot-1": {
+      "role": "pilot-calibration",
+      "seal_sha256": "10b421ecfc6780cc6e634e2c597b65f49a4e5dedf904d1fcd861d601865ad718"
+    },
+    "pilot-2": {
+      "role": "pilot-calibration",
+      "seal_sha256": "c526d562b84fe87277d19e8d86788e6c9497d04ef452136dee06a3a9cd3cb09f"
+    }
+  }
+}

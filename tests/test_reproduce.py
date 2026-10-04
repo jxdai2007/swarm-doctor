@@ -928,6 +928,13 @@ def test_hypotheses_do_not_promote_zero_dollars_outbreak_or_synthetic_as_drift_s
     row['config']['synthetic'] = True
     assert all(outcome['status'] == 'not_measured'
                for outcome in experiments._hypothesis_report({'fixture': row}, {'status': 'blocked'}).values())
+    row['config'].update(synthetic=False, agent_count=3)
+    row['role'] = 'pilot-calibration'
+    exploratory = experiments._hypothesis_report({'fixture': row}, {'status': 'blocked'})
+    assert exploratory['h1']['n'] == exploratory['h4']['n'] == 1
+    assert exploratory['h1']['mode'] == exploratory['h4']['mode'] == 'exploratory-pilot-replay'
+    assert exploratory['h1']['confirmatory_main_baseline_n'] == 0
+    assert exploratory['h7']['n'] == 0
 
 
 @pytest.mark.asyncio

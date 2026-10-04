@@ -1,0 +1,1 @@
+{"agent_count":3,"arm":"no-defense","checks_source":"immutable-post-run-shadow","metrics_all_arms_source":"counterfactual-replay","model_turn_budget":20,"prevention":false,"scenario":"outbreak","seed":1,"served_models":["kimi-for-coding"],"source":"live","spec_hash":"b93458ae6ff86e0e074596858b9629b7a7be8c88db4829b346ba5b80ea67650d","synthetic":false}

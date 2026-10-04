@@ -1,0 +1,37 @@
+{
+  "campaign_id": "below-one-live-20261004T0750Z",
+  "attempt": "authorized-transport-recovery-1",
+  "source_commit": "10b84a294861d692d97e67908d12332b711e7fec",
+  "previous_attempt_archive": "experiments/committed/live-attempts/below-one-live-20261004T0750Z",
+  "kimi_requests_used_before_launch": 23,
+  "kimi_quota_ceiling": 300,
+  "kimi_effective_read_timeout_seconds": 90,
+  "kimi_connect_write_pool_timeout_seconds": 30,
+  "native_key_cap_usd": 15,
+  "native_key_cumulative_usage_usd": 1.2894e-05,
+  "native_key_remaining_usd": 14.999987106,
+  "preflight_incremental_openrouter_usd": null,
+  "measurement_source_sha256": {
+    "belowone/experiments.py": "145863654d08664069d3faee4e4882895876893fcbca775736daebe494270801",
+    "belowone/harness/launcher.py": "3963b1f264b0da38e77889e3c91f0dc7ff93fe9cab3d229e39e027007e0c7d23",
+    "belowone/harness/schedule.py": "6275d0c53ba16a9e001f4efeb8cfd6d7b44afa3ddc8d0488e288534dfc510f98",
+    "belowone/meter.py": "78eb05627886b54abcf3b1f391d4658f8773b9ecddb910b1062dedab4738ec3e",
+    "belowone/models/kimi.py": "6dde2f0644b36bad8d018cc646d53e8082e92dfc6b0f41197cbc963642e452f9",
+    "belowone/models/jev.py": "324fe9b5a28ca7675d6c0196edf19fd7097b719475d05a0464480e318246b99e",
+    "belowone/models/router.py": "5109741853faff1099b4d3c33126fed6f206441697ca8c553af072d809296ff6",
+    "config/default.yaml": "40b7b53f27ab313eafd869a2805b7d5300f6be93d0d56f500952e1aff0763430",
+    "scenarios/manifest.yaml": "3dd423df9f414bd79189c79c48d3eb7fde633b1de502fbcb318133e4b4d06c27"
+  },
+  "requested_seeds": [
+    0,
+    1,
+    2
+  ],
+  "command": "make pilot PILOT_ROOT=/tmp/below-one-live-20261004T0750Z/recovery-pilot KIMI_REQUESTS_USED=23",
+  "start_utc": "2026-10-04T08:17:26.362937+00:00",
+  "log": "/tmp/below-one-live-20261004T0750Z/recovery-pilot.log",
+  "process_state": "finished",
+  "pid": 79940,
+  "exit": 0,
+  "terminal_observed_utc": "2026-10-04T08:49:13.324208+00:00"
+}

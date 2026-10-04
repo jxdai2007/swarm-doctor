@@ -276,9 +276,18 @@ def _hypothesis_report(data, monitor):
     real = {name: row for name, row in data.items() if not row['config']['synthetic']}
     baseline = {name: row for name, row in real.items()
                 if row.get('role') == 'baseline' and row['config']['agent_count'] == 5}
+    main_baseline_n = len(baseline)
+    exploratory_pilot = not baseline
+    if exploratory_pilot:
+        baseline = {name: row for name, row in real.items()
+                    if row.get('role') == 'pilot-calibration' and row['config']['agent_count'] == 3}
     hypotheses = {}
 
     def finish(identifier, samples, status, summary, source, mode, limitations=()):
+        if exploratory_pilot and identifier in {'h1', 'h2', 'h4'}:
+            source = 'post-hoc exploratory replay of sealed real 3-agent pilot calibration recordings'
+            mode = 'exploratory-pilot-replay'
+            summary += ' Resource-limited exploratory fallback; requested five-agent main study has N=0.'
         if not samples and status == 'not_measured' and identifier not in {'h3', 'h6'}:
             summary += ' No complete eligible comparison is available.'
             source = 'Missing prerequisite: ' + source
@@ -295,6 +304,8 @@ def _hypothesis_report(data, monitor):
         hypotheses[identifier] = {
             'status': status, 'summary': summary.replace('None', 'unmeasured'),
             'n': len(samples), 'source': source, 'mode': mode, 'comparisons': samples,
+            'confirmatory_main_baseline_n': main_baseline_n,
+            'exploratory_pilot_fallback': exploratory_pilot and identifier in {'h1', 'h2', 'h4'},
             'strata': {key: {'n': len(rows), 'comparisons': rows} for key, rows in sorted(strata.items())},
             'provenance': {name: real[name]['provenance'] for name in names},
             'uncertainty': 'Observed directions only; small-N, cached decisions and pending/failed cohorts limit generalization. Model/scenario/role strata are retained. No new significance test or acceptance threshold.',
@@ -319,7 +330,8 @@ def _hypothesis_report(data, monitor):
                                                         for left, right in zip(sweep, sweep[1:])],
                             'delay_points': sweep})
     finish('h1', samples, direction([change for sample in samples for change in sample['adjacent_damage_changes']]),
-           'Shortest-to-longest delay damage changes are reported per sealed baseline and model stratum.',
+           'Observed endpoint damage changes per eligible recording: ' +
+           json.dumps([sample['damage_change'] for sample in samples]) + '; model/scenario strata remain separate.',
            'counterfactual replays of sealed real five-agent baseline recordings',
            'counterfactual-replay', ['Recorded actions do not generate new behavior after intervention.'])
 
@@ -343,6 +355,8 @@ def _hypothesis_report(data, monitor):
     finish('h2', samples, status, 'Paired containment and clean-frozen effects are retained per baseline/model stratum.',
            'paired cached-policy replays of sealed real five-agent baseline recordings', 'counterfactual-replay',
            ['No-outbreak recordings do not establish containment equivalence; no noninferiority margin was preregistered.'])
+    if not samples:
+        hypotheses['h2']['summary'] += ' No eligible outbreak denominator; no-outbreak records are not containment evidence.'
 
     finish('h3', [], 'not_measured',
            'Strict versus kill-all is not measured: existing blunt K-hop arm is not a kill-all comparator.',
@@ -353,7 +367,9 @@ def _hypothesis_report(data, monitor):
                 'false_steer_reduction': row['ablation']['false_steer_delta']}
                for name, row in baseline.items()]
     finish('h4', samples, direction([sample['false_alarm_reduction'] for sample in samples]),
-           'One-line minus locked-spec false-alarm and false-steer effects are retained per baseline/model stratum.',
+           'Observed one-line minus locked-spec false-alarm differences: ' +
+           json.dumps([sample['false_alarm_reduction'] for sample in samples]) +
+           '; false-steer differences: ' + json.dumps([sample['false_steer_reduction'] for sample in samples]) + '.',
            'independently cached locked-spec versus one-line replays of sealed real baseline recordings',
            'counterfactual-replay', ['Scenario locked specs are not new operator interviews or human ground-truth labels.'])
 
@@ -404,7 +420,7 @@ def _hypothesis_report(data, monitor):
     if not samples:
         mode, source = 'counterfactual-replay', 'cached-policy replays of sealed real five-agent drift baseline recordings'
         for name, row in baseline.items():
-            if row['config']['scenario'] != 'drift':
+            if row['config']['scenario'] != 'drift' or row['config']['agent_count'] != 5:
                 continue
             prompt, verify = row['arms']['prompt-only'], row['arms']['verify']
             samples.append({'runs': [name], 'seed': row['config']['seed'],

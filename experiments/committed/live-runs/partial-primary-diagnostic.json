@@ -1,0 +1,75 @@
+{
+  "action_proposals_per_agent": {
+    "a0": 5,
+    "a1": 5,
+    "a2": 5
+  },
+  "completed_outcomes": [],
+  "finish_actions": [],
+  "last_outcomes": [
+    {
+      "agent_id": "a0",
+      "completed": false,
+      "elapsed": 55.972953541669995,
+      "seq": 67
+    },
+    {
+      "agent_id": "a1",
+      "completed": false,
+      "elapsed": 57.291101624723524,
+      "seq": 72
+    },
+    {
+      "agent_id": "a2",
+      "completed": false,
+      "elapsed": 59.825920457951725,
+      "seq": 77
+    }
+  ],
+  "per_run_http_attempts": {
+    "pilot-0": {
+      "kimi": 119,
+      "openrouter": 108
+    },
+    "pilot-1": {
+      "kimi": 143,
+      "openrouter": 136
+    },
+    "pilot-2": {
+      "kimi": 15,
+      "openrouter": 0
+    }
+  },
+  "post_run_shadow_files_present": {
+    "checks.json": false,
+    "decisions-one-line.jsonl": false,
+    "decisions.jsonl": false,
+    "spec-interviewed.json": false,
+    "spec-one-line.json": false,
+    "summary.json": false
+  },
+  "source": "experiments/committed/live-runs/pilot-2",
+  "terminal_or_cleanup_controls": [
+    {
+      "agent_id": "a0",
+      "elapsed": 59.96785824978724,
+      "kind": "kill",
+      "reason": "Pilot stopped: Local Kimi request-window ceiling reached; campaign stopped (provider quota not observed)",
+      "seq": 79
+    },
+    {
+      "agent_id": "a1",
+      "elapsed": 59.98054429190233,
+      "kind": "kill",
+      "reason": "Pilot stopped: Local Kimi request-window ceiling reached; campaign stopped (provider quota not observed)",
+      "seq": 81
+    },
+    {
+      "agent_id": "a2",
+      "elapsed": 59.9954345417209,
+      "kind": "kill",
+      "reason": "Pilot stopped: Local Kimi request-window ceiling reached; campaign stopped (provider quota not observed)",
+      "seq": 83
+    }
+  ]
+}
