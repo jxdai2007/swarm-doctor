@@ -5,9 +5,9 @@ from types import SimpleNamespace
 import pytest
 
 from belowone.eval.arms import ARMS, replay_arm
-from belowone.eval.decisions import bind_actions, load_decisions, trace_key
+from belowone.eval.decisions import bind_actions, trace_key
 from belowone.eval.graph import rebuild
-from belowone.eval.replay import attribute, prune_log, replay_freeze_schedule, replay_no_defense
+from belowone.eval.replay import attribute, prune_log, replay_freeze_schedule
 from belowone.eval.delay import DAILY_REVIEW_SECONDS, delay_sweep
 from belowone.eval.ablation import ablate
 from belowone.eval.replay import provenance_paths
@@ -291,3 +291,98 @@ def test_real_empty_inbox_is_successful_without_phantom_graph_edge(tmp_path):
         'action': {'tool': 'read-inbox', 'operation': 'receive', 'paths': [], 'input': {}},
         'result': {'ok': True, 'messages': []}})
     assert rebuild(log.read()).edges == []
+
+
+def test_actual_unknown_access_journal_never_creates_blunt_shared_shell_contact(tmp_path):
+    log = EventLog(tmp_path / 'events.jsonl')
+    cache = {}
+    for agent, operation, path, at in [
+        ('a0', 'unknown', '__unknown__/bash', 1),
+        ('a1', 'unknown', '__unknown__/bash', 2),
+        ('a0', 'write', 'PASS', 3),
+        ('a1', 'write', 'reports/export.py', 5),
+    ]:
+        aid = f'opaque-{len(cache)}'
+        log.append(agent, 'action_executed', paths=[path], payload={
+            'elapsed': float(at), 'action_id': aid, 'manifest_drift': False,
+            'action': {'tool': 'bash' if operation == 'unknown' else 'write',
+                       'operation': operation, 'paths': [path], 'input': {}},
+            'result': {'ok': True},
+        })
+        cache[aid] = decision(aid, agent, at=at + .5,
+                              label='violation' if path == 'PASS' else 'clean')
+    events = log.read()
+    graph = rebuild(events)
+    unknown = [edge for edge in graph.edges if edge.get('unknown_access')]
+    assert len(unknown) == 2
+    assert all(edge['operation'] == 'unknown' and 'unobserved' in edge['reason'] for edge in unknown)
+    assert graph.trust['file:__unknown__/bash'] == 0
+    assert not graph.writes.get('__unknown__/bash')
+    assert not any(read['path'] == '__unknown__/bash' for read in graph.reads)
+    graph.poison('a0', last_clean_seq=0)
+    assert graph.contacts('a0') == []
+    assert not any(event.kind == 'infection' for event in events)
+    result = replay_arm(events, cache, spec_hash='spec', arm='blunt-khop')
+    assert {control['agent_id'] for control in result.controls if control['kind'] == 'kill'} == {'a0'}
+    assert events[-1] in result.retained
+
+
+@pytest.mark.parametrize('arm', ['verify', 'strict'])
+def test_later_version_after_clean_release_gets_own_trace_review(arm):
+    events = [action(1, 'a0', 1, 'write', 'first.py'),
+              action(2, 'a0', 2, 'write', 'second.py'),
+              action(3, 'a1', 3, 'read', 'first.py'),
+              action(4, 'a1', 8, 'read', 'second.py')]
+    cache = {e.payload['action_id']: decision(e.payload['action_id'], e.agent_id, at=e.payload['elapsed'])
+             for e in events}
+    cache['a1'] = decision('a1', 'a0', label='violation', at=4)
+    for seq in [3, 4]:
+        key = trace_key('a1', seq)
+        cache[key] = decision(key, 'a1', latency=.5, trace_review=True, reviewed_action_id=f'a{seq}')
+    result = replay_arm(events, cache, spec_hash='spec', arm=arm)
+    assert [control['read_event_id'] for control in result.controls if control['kind'] == 'trace'] == [3, 4]
+    if arm == 'strict':
+        assert [(control['kind'], control['elapsed']) for control in result.controls
+                if control['agent_id'] == 'a1' and control['kind'] in {'freeze', 'release'}] == [
+                    ('freeze', 4), ('release', 4.5), ('freeze', 8), ('release', 8.5)]
+
+
+def test_failed_late_write_receipt_matches_replay_and_historical_graph(tmp_path):
+    log = EventLog(tmp_path / 'events.jsonl')
+    path = tmp_path / 'shared.py'
+    path.write_text('partially written source')
+    content = path.read_text()
+    read = log.append('a1', 'action_executed', paths=['shared.py'], payload={
+        'elapsed': 2., 'action_id': 'reader',
+        'action': action(1, 'a1', 2, 'read', 'shared.py').payload['action'],
+        'result': {'ok': True, 'content': content}})
+    write = log.append('a0', 'action_executed', paths=['shared.py'], payload={
+        'elapsed': 1., 'action_id': 'writer', 'started_at_elapsed': .5,
+        'action': action(2, 'a0', 1, 'write', 'shared.py').payload['action'],
+        'result': {'ok': False, 'effects': 'observed'}})
+    cache = {'reader': decision('reader', 'a1', at=2.5),
+             'writer': decision('writer', 'a0', label='violation', at=1.5),
+             trace_key('a1', read.seq): decision(trace_key('a1', read.seq), 'a1',
+                                                trace_review=True, reviewed_action_id='reader')}
+    graph = rebuild(log.read())
+    graph.poison('a0', last_clean_seq=0)
+    assert graph.reads[0]['write_seq'] == write.seq
+    result = replay_arm(log.read(), cache, spec_hash='spec', arm='strict')
+    assert [control['read_event_id'] for control in result.controls if control['kind'] == 'trace'] == [read.seq]
+    assert write.seq in {event.seq for event in result.retained}
+    chronological = rebuild(sorted(log.read(), key=lambda event: event.payload['elapsed']))
+    chronological.poison('a0', last_clean_seq=0)
+    assert graph.contacts('a0') == chronological.contacts('a0')
+
+
+def test_started_writer_settlement_survives_terminal_control_but_unstarted_work_does_not():
+    partial = action(1, 'a0', 5, 'write', 'shared.py', started_at_elapsed=1.,
+                     result={'ok': False, 'effects': 'possible'})
+    later = action(2, 'a0', 6, 'write', 'unstarted.py')
+    downstream = action(3, 'a1', 7, 'read', 'shared.py',
+                        result={'ok': True, 'provenance_paths': [[partial.seq]]})
+    controls = [{'agent_id': 'a0', 'kind': 'kill', 'elapsed': 2}]
+    assert [event.seq for event in prune_log([partial, later, downstream], controls=controls)] == [1, 3]
+    graph = rebuild([partial, downstream])
+    graph.poison('a0', last_clean_seq=0)
+    assert graph.contacts('a0')[0]['seq'] == downstream.seq

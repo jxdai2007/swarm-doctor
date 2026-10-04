@@ -53,7 +53,8 @@ class Tracer:
                     # Taint from first causal contact, not clean activity before exposure.
                     clean_point = min(self.graph.last_clean[agent], contacts[agent]['seq'] - 1)
                     self.graph.poison(agent, last_clean_seq=clean_point)
-                    self._emit(agent, 'freeze', {'reason': result.get('reason', 'Trace-confirmed violation'), 'confirmed': True})
+                    self._emit(agent, 'freeze', {'reason': result.get('reason', 'Trace-confirmed violation'),
+                                                 'confirmed': True, 'last_clean_seq': clean_point})
                     confirmed.append(agent)
                     frontier.append(agent)
                 elif label == 'drift':

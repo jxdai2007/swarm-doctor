@@ -25,14 +25,14 @@ const cy = cytoscape({
     { selector: "node.untrusted", style: {
       "background-color": "#5a4a22", "border-width": 2,
       "border-color": "#ffd27a", color: "#ffd27a" } },
-    { selector: "node.killed", style: {
-      "background-color": "#1a1d21", "border-width": 3,
-      "border-color": POISON, color: POISON, opacity: 0.6 } },
     { selector: "node.infected", style: {
       "background-color": POISON, label: "data(id)" } },
     { selector: "node.frozen", style: {
       "background-color": "#3a3325", "border-width": 3,
       "border-color": FROZEN, color: FROZEN } },
+    { selector: "node.killed, node.ended", style: {
+      "background-color": "#1a1d21", "border-width": 3,
+      "border-color": POISON, color: POISON, opacity: 0.6 } },
     { selector: "edge", style: {
       width: 1.5, "line-color": DIM, "curve-style": "bezier",
       "target-arrow-shape": "triangle", "arrow-color": DIM,
@@ -94,9 +94,13 @@ function normalizeSnapshot(snap) {
         classes: isFile ? "file" : "", keep: true };
     });
     const known = new Set(nodeEls.map((n) => n.data.id));
+    for (const id of agentIds) {
+      if (!known.has(id)) nodeEls.push({ group: "nodes", data: { id }, classes: "" });
+      known.add(id);
+    }
     const edges = (snap.graph.edges || []).map((e, i) => ({
       group: "edges", data: {
-        id: `g${i}`, source: String(e.source).replace(/^agent:/, ""),
+        ...e, id: `g${i}`, source: String(e.source).replace(/^agent:/, ""),
         target: String(e.target).replace(/^agent:/, ""),
         path: e.path ?? "",
       },
@@ -104,6 +108,7 @@ function normalizeSnapshot(snap) {
     const agents = snap.agents
       || Object.fromEntries([...agentIds].map((id) => [id, snap.states?.[id] ?? "clean"]));
     return { synthetic: !!snap.synthetic, agents, nodeEls, edges,
+             last_seq: snap.last_seq,
              counters: snap.counters || [],
              controls: snap.controls || [],
              time_since_poisoning_s: snap.time_since_poisoning_s ?? null,
@@ -117,7 +122,12 @@ function normalizeSnapshot(snap) {
 }
 
 function applySnapshot(snap) {
+  const seq = snap.last_seq ?? Math.max(0, ...(snap.events || [])
+    .map((e) => Number.isInteger(e.seq) ? e.seq : 0));
+  if (seq < latestSeq) return false;
+  latestSeq = seq;
   snap = normalizeSnapshot(snap);
+  for (const ev of [...(snap.events || []), ...(snap.controls || [])]) retain(ev);
   document.getElementById("synthetic-badge").classList.toggle("on", !!snap.synthetic);
   const els = [];
   for (const n of (snap.nodeEls || [])) {
@@ -131,17 +141,18 @@ function applySnapshot(snap) {
     const d = e.data || e;  // normalized wrappers vs raw edge objects
     if (!d.source || !d.target) continue;
     els.push({ group: "edges", data: {
-      id: `e${i}`, source: d.source, target: d.target, path: d.path } });
+      ...d, id: `e${i}`, source: d.source, target: d.target, path: d.path } });
   }
   cy.elements().remove();
   cy.add(els.length ? els : [{ group: "nodes", data: { id: "—" } }]);
+  for (const agent of r24.infected) cy.getElementById(agent).addClass("infected");
   refit();
   renderCounters(snap.counters);
+  if (replaying) applyAt(replayTime);
+  return true;
 }
 
-// Debounced same-engine snapshot refresh: executed actions change the graph,
-// so re-pull /snapshot (serial — never parallel requests) and re-apply while
-// keeping the clock and R24 citations untouched.
+// Serial graph refreshes reject snapshots older than an SSE event already seen.
 let refreshTimer = null;
 let refreshBusy = false;
 let refreshQueued = false;
@@ -152,8 +163,11 @@ function scheduleGraphRefresh(run) {
     if (refreshBusy) { refreshQueued = true; return; }
     refreshBusy = true;
     try {
-      const res = await fetch(`/snapshot?run=${encodeURIComponent(run)}`);
-      if (res.ok) applySnapshot(await res.json());
+      const res = await fetch(runUrl("/snapshot", run));
+      if (!res.ok) throw new Error(`Snapshot HTTP ${res.status}`);
+      applySnapshot(await res.json());
+    } catch (error) {
+      disconnect(error);
     } finally {
       refreshBusy = false;
       if (refreshQueued) { refreshQueued = false; scheduleGraphRefresh(run); }
@@ -175,7 +189,7 @@ function renderCounters(rows) {
   }
 }
 
-function tick(ev) {
+function tick(ev, animate = true) {
   const t = document.getElementById("ticker");
   const div = document.createElement("div");
   const who = ev.agent_id ?? "—";
@@ -189,7 +203,7 @@ function tick(ev) {
   t.prepend(div);
   if (ev.kind === "freeze") {
     const n = cy.getElementById(ev.agent_id);
-    if (n.nonempty()) { n.addClass("frozen"); pulse(n); }
+    if (n.nonempty()) { n.addClass("frozen"); if (animate) pulse(n); }
   }
   if (ev.kind === "infection") {
     const n = cy.getElementById(ev.agent_id);
@@ -197,11 +211,15 @@ function tick(ev) {
   }
   if (ev.kind === "trace") {
     const n = cy.getElementById(ev.agent_id);
-    if (n.nonempty()) pulse(n);  // trace ring moment
+    if (animate && n.nonempty()) pulse(n);
   }
   if (ev.kind === "release") {
     const n = cy.getElementById(ev.agent_id);
     if (n.nonempty()) n.removeClass("frozen");
+  }
+  if (ev.kind === "kill" || ev.kind === "end") {
+    const n = cy.getElementById(ev.agent_id);
+    if (n.nonempty()) { n.removeClass("frozen"); n.addClass(ev.kind === "kill" ? "killed" : "ended"); }
   }
   updateR24(ev);
 }
@@ -234,6 +252,7 @@ function updateR24(ev) {
     r24.frozen.delete(ev.agent_id);
     r24.released.add(ev.agent_id);
   }
+  if (ev.kind === "kill" || ev.kind === "end") r24.frozen.delete(ev.agent_id);
   const el = document.getElementById("r24");
   if (!el) return;
   const n_infected = r24.infected.size;
@@ -255,78 +274,149 @@ function updateR24(ev) {
 
 const fmt = (s) => (typeof s === "number" ? s.toFixed(1) + "s" : "unmeasured");
 
-// Shared relative clock: scrub + animation in live and split panels.
+// Live updates and replay use the same retained event prefix.
 const scrub = document.getElementById("scrub");
 const clock = document.getElementById("clock");
-let maxElapsed = 1;
+const status = document.getElementById("connection-status");
+const reconnect = document.getElementById("reconnect");
+let latestSeq = 0, lastEventSeq = 0, maxElapsed = 1;
+let replayTime = 0, replaying = false, animation = null;
+let streamController = null;
+const retained = new Map();
+const elapsed = (ev) => ev.elapsed ?? ev.payload?.elapsed ?? 0;
+function retain(ev) {
+  const key = ev.seq ?? `${ev.kind}:${ev.agent_id}:${elapsed(ev)}`;
+  const fresh = !retained.has(key);
+  retained.set(key, { ...ev, elapsed: elapsed(ev) });
+  return fresh;
+}
+function runUrl(path, run, after = null) {
+  const query = new URLSearchParams();
+  if (run) query.set("run", run);
+  if (after !== null) query.set("after", after);
+  return path + (query.size ? `?${query}` : "");
+}
+function connection(message, retry = false) {
+  status.textContent = message;
+  status.dataset.disconnected = String(retry);
+  reconnect.hidden = !retry;
+}
+function disconnect(error) {
+  streamController?.abort();
+  connection(`Disconnected — ${error.message}. Reconnect to recover.`, true);
+}
+function stopPlayback() {
+  if (animation !== null) cancelAnimationFrame(animation);
+  animation = null;
+}
 function setClock(t) {
-  clock.textContent = `t = ${fmt(t)} (relative)`;
+  clock.textContent = `t = ${fmt(t)} (task start)`;
   scrub.value = Math.round((t / maxElapsed) * 1000);
 }
-scrub.addEventListener("input", () => {
-  const t = (scrub.value / 1000) * maxElapsed;
-  clock.textContent = `t = ${fmt(t)} (relative)`;
-  document.dispatchEvent(new CustomEvent("clock", { detail: t }));
-});
+function applyAt(t) {
+  replayTime = t;
+  cy.nodes().stop(true, false).removeStyle().removeClass("infected frozen killed ended");
+  cy.edges().forEach((edge) => {
+    const at = edge.data("elapsed") ?? elapsed(retained.get(edge.data("seq")) || {});
+    edge.style("display", at <= t ? "element" : "none");
+  });
+  document.getElementById("ticker").innerHTML = "";
+  Object.assign(r24, { infected: new Set(), frozen: new Set(), released: new Set(),
+    children: {}, poisoned_at: null, first_seq: null, last_seq: null, control_seqs: [] });
+  updateR24({});
+  const byT = [...retained.values()].sort((a, b) =>
+    elapsed(a) - elapsed(b) ||
+    (typeof a.seq === "number" && typeof b.seq === "number" ? a.seq - b.seq : 0));
+  for (const ev of byT) {
+    if (elapsed(ev) > t) break;
+    tick(ev, false);
+  }
+  setClock(t);
+}
+function replayTimeline() {
+  replaying = true;
+  stopPlayback();
+  maxElapsed = Math.max(1, ...[...retained.values()].map(elapsed));
+  // Metric rows remain explicitly final-recording totals, not prefix estimates.
+  document.getElementById("counter-heading").textContent = "Recorded totals";
+  const duration = Math.min(maxElapsed * 100, 30000);
+  const start = performance.now();
+  function step(now) {
+    const t = Math.min(maxElapsed, ((now - start) / duration) * maxElapsed);
+    applyAt(t);
+    animation = t < maxElapsed ? requestAnimationFrame(step) : null;
+  }
+  step(start);
+}
 
 async function runLive(run) {
-  const res = await fetch(`/events?run=${encodeURIComponent(run)}`);
-  const reader = res.body.getReader();
-  const dec = new TextDecoder();
-  let buf = "";
-  const events = [];
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    let idx;
-    while ((idx = buf.indexOf("\n\n")) >= 0) {
-      const chunk = buf.slice(0, idx); buf = buf.slice(idx + 2);
-      const data = chunk.split("\n").filter((l) => l.startsWith("data: "))
-        .map((l) => l.slice(6)).join("");
-      if (!data) continue;
-      if (data === "[done]") continue;
-      try {
-        const obj = JSON.parse(data);
+  stopPlayback();
+  replaying = false;
+  if (retained.size) applyAt(maxElapsed);
+  streamController?.abort();
+  const controller = new AbortController();
+  streamController = controller;
+  connection("Connecting…");
+  let reader;
+  try {
+    const res = await fetch(runUrl("/events", run, lastEventSeq),
+      { signal: controller.signal });
+    if (!res.ok) throw new Error(`Events HTTP ${res.status}`);
+    if (!res.body) throw new Error("Event stream unavailable");
+    reader = res.body.getReader();
+    connection("Connected");
+    const dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) throw new Error("Event stream closed");
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const chunk = buf.slice(0, idx); buf = buf.slice(idx + 2);
+        const data = chunk.split("\n").filter((l) => l.startsWith("data: "))
+          .map((l) => l.slice(6)).join("\n");
+        if (!data) continue;
+        if (data === "[done]") {
+          connection("Replay — recorded stream complete");
+          replayTimeline();
+          await reader.cancel();
+          return;
+        }
+        let obj;
+        try { obj = JSON.parse(data); } catch { continue; }
         if (obj.synthetic !== undefined || obj.counters) {
           document.getElementById("run-name").textContent =
-            `${run}${obj.synthetic ? " (synthetic-development)" : ""}`;
+            `${run || "live"}${obj.synthetic ? " (synthetic-development)" : ""}`;
           applySnapshot(obj);
         } else {
-          events.push(obj); tick(obj);
-          if (obj.kind === "action_executed")
-            scheduleGraphRefresh(run);  // executed writes/reads change graph
+          if (Number.isInteger(obj.seq)) {
+            lastEventSeq = Math.max(lastEventSeq, obj.seq);
+            latestSeq = Math.max(latestSeq, obj.seq);
+          }
+          const fresh = retain(obj);
+          if (fresh && !replaying) tick(obj);
+          if (obj.kind === "action_executed") scheduleGraphRefresh(run);
+          maxElapsed = Math.max(maxElapsed, elapsed(obj));
+          if (!replaying) setClock(elapsed(obj));
         }
-      } catch { /* skip malformed */ }
+      }
     }
-  }
-  if (events.length) {
-    maxElapsed = Math.max(...events.map((e) => e.elapsed || 0), 1);
-    replayTimeline(events);
+  } catch (error) {
+    if (!controller.signal.aborted) disconnect(error);
+  } finally {
+    reader?.releaseLock();
   }
 }
 
-// Step events along the shared clock; the scrub re-derives state.
-function replayTimeline(events) {
-  const byT = [...events].sort((a, b) => (a.elapsed || 0) - (b.elapsed || 0));
-  let i = 0;
-  document.addEventListener("clock", (e) => {
-    const t = e.detail;
-    while (i < byT.length && (byT[i].elapsed || 0) <= t) { tick(byT[i]); i++; }
-    while (i > 0 && (byT[i - 1].elapsed || 0) > t) { i--; }
-  });
-  const dur = Math.min(maxElapsed * 100, 30000);
-  const t0 = performance.now();
-  (function step(now) {
-    const t = ((now - t0) / dur) * maxElapsed;
-    setClock(t);
-    if (t < maxElapsed) requestAnimationFrame(step);
-  })(t0);
-}
-
-// In split mode the race panels own the shared clock (split.js); no default
-// live run is streamed.
 if (params.get("mode") !== "split") {
-  runLive(params.get("run") || "fixture-outbreak");
+  const run = params.get("run");
+  scrub.addEventListener("pointerdown", stopPlayback);
+  scrub.addEventListener("input", () => {
+    stopPlayback();
+    replaying = true;
+    applyAt((scrub.value / 1000) * maxElapsed);
+  });
+  reconnect.addEventListener("click", () => runLive(run));
+  runLive(run);
 }
-

@@ -72,15 +72,17 @@ class Truth:
                     observed = [(path, result.get('content', '')) for path in event.paths]
                 for path, content in observed:
                     version = self.versions.get(path)
-                    if version and version['source_infection'] is not None:
-                        causal = [*version['dependencies'], version['seq'], event.seq]
-                        contact = {'source_agent': version['agent'], 'write_event_id': version['seq'],
-                                   'read_event_id': event.seq, 'path': causal, 'content': content}
-                        self.contacts.setdefault(agent, []).append(contact)
+                    if version and version['tainted']:
+                        causal_paths = [[*dependency, version['seq'], event.seq]
+                                        for dependency in version['dependencies']]
+                        for causal in causal_paths:
+                            contact = {'source_agent': version['agent'], 'write_event_id': version['seq'],
+                                       'read_event_id': event.seq, 'path': causal, 'content': content}
+                            self.contacts.setdefault(agent, []).append(contact)
                         self.append(agent, 'exposure', source_agent=version['agent'],
                                     write_event_id=version['seq'], read_event_id=event.seq,
                                     last_clean_seq=self.last_clean.get(agent, 0),
-                                    provenance_paths=[causal], manifest_action='observed infected source version')
+                                    provenance_paths=causal_paths, manifest_action='observed infected source version')
             if infected and agent not in self.infections:
                 contacts = self.contacts.get(agent, [])
                 primary = contacts[-1] if contacts else None
@@ -91,14 +93,15 @@ class Truth:
                     read_event_id=primary['read_event_id'] if primary else None,
                     last_clean_seq=self.last_clean.get(agent, 0), provenance_paths=paths,
                     manifest_action=manifest, action_id=event.payload['action_id'])
-            if op in {'write', 'send'}:
-                deps = result.get('provenance_paths', [])
-                for path in event.paths:
-                    self.versions[path] = {'agent': agent, 'seq': event.seq,
-                        'source_infection': self.infections.get(agent) if infected or deps else None,
-                        'dependencies': deps[0] if deps else ([self.infections[agent].seq] if infected else [])}
-            if not infected:
-                self.last_clean[agent] = event.seq
+        if (op in {'write', 'send'} and
+                (result['ok'] or result.get('effects') in {'observed', 'possible'})):
+            deps = result.get('provenance_paths', [])
+            for path in event.paths:
+                self.versions[path] = {'agent': agent, 'seq': event.seq,
+                    'tainted': bool(infected or deps),
+                    'dependencies': deps or ([[self.infections[agent].seq]] if infected else [[]])}
+        if result['ok'] and not infected:
+            self.last_clean[agent] = event.seq
         offscope = bool(set(event.paths) & set(gt['offscope']['paths']))
         impossible = gt.get('impossible')
         repeated = False

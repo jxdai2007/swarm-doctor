@@ -163,9 +163,13 @@ def test_correction_flips_verdict_both_ways(workspace):
     # operator says that verdict is wrong: flip it to allow via the corrector
     corrected = iv.apply_correction(spec_dict, {"index": notes_index,
                                                 "verdict": "allow"}, examples)
+    assert corrected["compartments"]["*"] == [
+        "src/*", "reports.csv", "docs/notes.md"]
+    assert spec_dict["compartments"]["*"] == ["src/*", "reports.csv"]
     after = asyncio.run(verdicts_for(corrected))
     assert after["write notes beyond task scope"]["label"] == "clean"
     assert after["write notes beyond task scope"]["layer"] == "jev"
+    assert after["implement src/tool.py"]["label"] == "clean"
 
     # and the other direction: forbid the previously-clean work file
     forbidded = iv.apply_correction(
@@ -176,6 +180,74 @@ def test_correction_flips_verdict_both_ways(workspace):
     with pytest.raises(ValueError):
         iv.apply_correction(spec_dict, {"index": 2, "verdict": "allow"},
                             examples)
+
+
+@pytest.mark.parametrize("compartments", [{}, {"other-agent": ["restricted/*"]}])
+@pytest.mark.parametrize("examples", [
+    [
+        {"tool": "write", "operation": "write", "paths": ["src/tool.py"],
+         "input": "implement source"},
+        {"tool": "write", "operation": "write", "paths": ["reports.csv"],
+         "input": "export report"},
+    ],
+    [
+        {"tool": "bash", "operation": "execute", "paths": [],
+         "input": "python src/tool.py"},
+        {"tool": "bash", "operation": "execute", "paths": [],
+         "input": "python -m compileall src"},
+    ],
+    [
+        {"tool": "network", "operation": "request", "paths": [],
+         "input": "GET https://example.com/report"},
+        {"tool": "network", "operation": "request", "paths": [],
+         "input": "GET https://example.org/schema"},
+    ],
+], ids=["file", "command", "network"])
+def test_allow_correction_preserves_unrestricted_resources(
+        workspace, compartments, examples):
+    import asyncio
+    spec_dict = iv.build_spec(
+        _questions(scan=iv.scan_workspace(workspace)), {}, TASK)
+    spec_dict["compartments"] = compartments
+
+    async def check(sd, *, replay=False):
+        clients = {"jev": recorded_jev(workspace / "cache"), "judge": None,
+                   "offline_failclosed": False}
+        if replay:
+            clients["jev"].cassette = iv.Cassette(workspace / "cache", "replay")
+        try:
+            return await iv.dry_run(
+                GoalSpec.from_dict(sd, workspace=workspace),
+                workspace / "cache", examples, clients)
+        finally:
+            await clients["jev"].http.aclose()
+
+    assert all(v["label"] == "clean" for v in asyncio.run(check(spec_dict)))
+    for index in range(len(examples)):
+        spec_dict = iv.apply_correction(
+            spec_dict, {"index": index, "verdict": "allow"}, examples)
+        assert spec_dict["compartments"] == compartments
+        assert all(v["label"] == "clean"
+                   for v in asyncio.run(check(spec_dict, replay=True)))
+    out = workspace / "goal-spec.json"
+    iv.lock(spec_dict, workspace, out)
+    locked = load_locked_spec(out, workspace=workspace)
+    assert dict(locked.compartments) == {
+        agent: tuple(patterns) for agent, patterns in compartments.items()}
+
+
+@pytest.mark.parametrize("field", ["decoys", "high_risk_paths"])
+def test_unrestricted_allow_correction_still_rejects_protected_resource(
+        workspace, field):
+    spec_dict = iv.build_spec(
+        _questions(scan=iv.scan_workspace(workspace)), {}, TASK)
+    spec_dict[field] = ["reports.csv"]
+    examples = [{"tool": "read", "operation": "read",
+                 "paths": ["reports.csv"], "input": "read protected report"}]
+    with pytest.raises(ValueError, match="reports.csv is protected"):
+        iv.apply_correction(
+            spec_dict, {"index": 0, "verdict": "allow"}, examples)
+    assert spec_dict["compartments"] == {}
 
 
 def test_correction_field_forms_validated(workspace):
@@ -261,8 +333,8 @@ def test_cli_scripted_custom_answers_lock_and_rerun(tmp_path, capsys):
     assert locked.gray_zones == {"flaky tests": "allow"}
     assert list(locked.hard_lines) == ["Never delete reports.csv"]
     assert list(locked.done_when) == ["reports.csv exported", "tests pass"]
-    # verdict=allow for the work-file example whitelists its real path
-    assert "src/tool.py" in locked.compartments.get("*", ())
+    # Allowing one example keeps all unprotected task paths unrestricted.
+    assert "*" not in locked.compartments
     out2 = tmp_path / "goal-spec-2.json"
     rc2 = cli_main(["interview", "--task", str(task), "--workspace",
                     str(tmp_path), "--scripted", str(answers),
@@ -314,7 +386,7 @@ def test_correction_input_syntax(monkeypatch):
 
 def test_cli_interactive_correction_input(tmp_path, monkeypatch, capsys):
     """Actual interactive path: typed recommendation accepts via Enter, then
-    `1=allow` flips the decoy-read verdict; lock proceeds."""
+    `1=allow` preserves unrestricted work-file access; lock proceeds."""
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "tool.py").write_text("x=1\n")
     (tmp_path / ".env.production").write_text("S=1\n")
@@ -340,7 +412,7 @@ def test_cli_interactive_correction_input(tmp_path, monkeypatch, capsys):
     assert rc == 0
     locked = load_locked_spec(out, workspace=tmp_path)
     assert locked.budgets["steps_per_agent"] == 25
-    assert "src/tool.py" in locked.compartments.get("*", ())
+    assert "*" not in locked.compartments
 
 
 def test_cli_nested_lock_target_is_tripwire_protected(tmp_path, capsys):

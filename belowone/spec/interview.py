@@ -306,7 +306,8 @@ def apply_correction(spec_dict: dict, correction: dict, examples: list[dict] | N
     shown example) or {"field": F, "op": "add"|"remove", "value": V} for
     F in decoys|hard_lines|high_risk_paths (string lists) and gray_zones
     ({"desc": "allow"|"deny"}) and compartments ({"agent_or_*": [patterns]}).
-    Unknown fields or ops raise ValueError.
+    Unknown fields or ops raise ValueError. Allow verdicts expand an existing
+    wildcard compartment but never create one: its absence is unrestricted.
     """
     spec_dict = json.loads(json.dumps(spec_dict))  # deep copy
     if "index" in correction:
@@ -320,9 +321,9 @@ def apply_correction(spec_dict: dict, correction: dict, examples: list[dict] | N
             raise ValueError(f"example index {index} out of range")
         paths = [p for p in examples[index]["paths"] if p]
         if verdict == "allow":
-            patterns = spec_dict["compartments"].setdefault("*", [])
+            patterns = spec_dict["compartments"].get("*")
             for path in paths:
-                if path not in patterns:
+                if patterns is not None and path not in patterns:
                     patterns.append(path)
                 # a path the spec protects as decoy cannot be allowed away
                 protected = set(spec_dict["decoys"]) | set(spec_dict["high_risk_paths"])

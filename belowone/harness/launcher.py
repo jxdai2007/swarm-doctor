@@ -27,7 +27,7 @@ from belowone.eval.replay import replay_freeze_schedule
 from belowone.runstore import RunStore
 from belowone.spec.lock import lock_spec, spec_hash
 from belowone.spec.schema import GoalSpec
-from scenarios import ROOT, load_scenario, prepare_scenario
+from scenarios import ROOT, check_scenario, load_scenario, prepare_scenario
 
 from .agent import Agent, while_alive
 from .arms import Truth, live_spec
@@ -276,7 +276,7 @@ async def run(store, run_id, *, seed, arm, scenario, clients, workspace_root, co
             runnable = False
             for agent in list(agents):
                 await engine.wait_pending_traces()
-                state = engine.snapshot()['states'][agent.id]
+                state = engine.agent_state(agent.id)['state']
                 if state == 'ended' and prevention and not agent.id.endswith('-r1'):
                     replacement_id = agent.id + '-r1'
                     if replacement_id not in agent_tools:
@@ -320,34 +320,38 @@ async def run(store, run_id, *, seed, arm, scenario, clients, workspace_root, co
                     except (OSError, ValueError, UnicodeError):
                         files[path] = None
                 answer = await engine.decide(agent.id, action)
-                proposal = next(event for event in reversed(log.read()) if event.kind == 'action_proposed'
-                                and event.payload['action_id'] == action['action_id'])
                 allowed = answer['allow'] and action['tool'] != 'invalid'
                 if allowed:
-                    claim = engine.start(agent.id, answer['decision_id'])
+                    claim = await engine.start(agent.id, answer['decision_id'])
                     allowed = claim['allow']
+                interrupted = None
                 if allowed:
+                    before = tools.file_state(action) if action['operation'] in {'read', 'write'} else {}
                     try:
                         result = await while_alive(tools.execute(action, messages=answer.get('messages', [])), engine, agent.id)
-                    except asyncio.CancelledError:
-                        if engine.snapshot()['states'][agent.id] not in {'killed', 'ended'}:
-                            raise
-                        result = {'ok': False, 'error': 'Tool cancelled after agent terminated'}
+                    except BaseException as exc:
+                        result = {'ok': False, 'error': ('Tool cancelled after agent terminated'
+                                  if isinstance(exc, asyncio.CancelledError) else str(exc))}
+                        if not isinstance(exc, asyncio.CancelledError) or engine.agent_state(agent.id)['state'] not in {'killed', 'ended'}:
+                            interrupted = exc
+                    result = tools.settle_effects(action, before, result)
                 else:
                     result = {'ok': False, 'error': answer['reason'] if action['tool'] != 'invalid' else action['input']['error']}
                 result['cost_usd'] = cost
                 dependencies = truth.dependencies(agent.id, action)
-                if result['ok'] and dependencies:
+                if (result['ok'] or result.get('effects') in {'observed', 'possible'}) and dependencies:
                     result['provenance_paths'] = dependencies
                 event = engine.record(agent.id, action, result, decision_id=answer['decision_id'], elapsed=clock())
                 truth.record(event, action, result, cost=cost, served_model=identity)
                 snapshots.append({'agent_id': agent.id, 'action_id': action['action_id'],
                     'action': {key: value for key, value in action.items() if key != 'action_id'},
-                    'files': files, 'elapsed': proposal.payload['elapsed'], 'proposal_seq': proposal.seq,
+                    'files': files, 'elapsed': answer['proposal_elapsed'], 'proposal_seq': answer['proposal_seq'],
                     'event_seq': event.seq, 'operation': action['operation'], 'paths': event.paths, 'result': result,
                     'model_calls': [attempt['call'] for attempt in response.get('_belowone_attempts', []) if 'call' in attempt]})
                 agent.observe(result, answer)
                 completed |= result.get('completed', False)
+                if interrupted is not None:
+                    raise interrupted
             if not runnable:
                 break
         live_calls = clients.meter.report()['calls'][live_start_calls:]
@@ -371,7 +375,13 @@ async def run(store, run_id, *, seed, arm, scenario, clients, workspace_root, co
                                           defense_cost_usd=defense_cost),
                           'source': 'actual-recorded-live-policy', 'synthetic': clients.synthetic}
         store.write_json(folder, 'metrics.json', actual_metrics)
-        summary = {**config, 'completed': completed, 'states': engine.snapshot()['states'],
+        # Finish can be followed by another agent's write; grade final bytes again.
+        final_graders = [await asyncio.to_thread(check_scenario, path)
+                         for path in dict.fromkeys(tools.workspace for tools in agent_tools.values())]
+        final_grader = next((grade for grade in final_graders if grade['passed']), final_graders[0])
+        completed = final_grader['passed']
+        summary = {**config, 'completed': completed, 'grader': final_grader,
+                   'states': {agent: engine.agent_state(agent)['state'] for agent in known_ids},
                    'turns': {agent.id: agent.turns for agent in agents}, 'served_models': sorted(served),
                    'infections': len(truth.infections),
                    'secondary_infections': sum(event.payload['source_agent'] is not None for event in truth.infections.values()),

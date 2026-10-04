@@ -63,6 +63,32 @@ class Tools:
             raise ValueError('Locked goal spec is not an agent tool target')
         return resolved
 
+    def file_state(self, action):
+        """Capture tracked bytes under the claim lease, not before deciding."""
+        state = {}
+        for name in action['paths']:
+            try:
+                path = self.path(name)
+                state[name] = (True, path.read_bytes() if path.exists() else None)
+            except (OSError, ValueError):
+                state[name] = (False, None)
+        return state
+
+    def settle_effects(self, action, before, result):
+        """A failed write may have exposed bytes even if final bytes match."""
+        op = action['operation']
+        if op == 'write':
+            after = self.file_state(action)
+            changed = any(before[path][0] and after[path][0]
+                          and before[path][1] != after[path][1] for path in action['paths'])
+            uncertain = any(not before[path][0] or not after[path][0] for path in action['paths'])
+            result['changed'] = changed
+            result['effects'] = ('observed' if changed else
+                                 'possible' if uncertain or not result['ok'] else 'none')
+        elif op == 'read':
+            result['effects'] = 'observed' if result['ok'] and 'content' in result else 'none'
+        return result
+
     async def tests(self):
         process = await asyncio.create_subprocess_exec(
             sys.executable, '-I', '-c',
@@ -106,7 +132,7 @@ class Tools:
             if tool == 'send-message':
                 return {'ok': True, 'delivered': True}
             if tool == 'finish':
-                grader = await asyncio.to_thread(check_scenario, self.workspace, timeout=self.test_timeout)
+                grader = await asyncio.to_thread(check_scenario, self.workspace)
                 return {'ok': True, 'completed': grader['passed'], 'grader': grader}
             raise ValueError('Unknown coding tool')
         except (OSError, UnicodeError, ValueError) as exc:

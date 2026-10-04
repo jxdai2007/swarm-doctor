@@ -178,3 +178,37 @@ async def test_killed_contacts_skipped_like_ended(tmp_path):
     result = await Tracer(graph, lifecycle, check, mode='strict').trace('a0', last_clean_seq=0)
     assert lifecycle.state('a1') == 'killed'
     assert result['confirmed'] == []
+
+
+def test_late_receipt_rebinds_read_edge_to_latest_earlier_version(tmp_path):
+    from belowone.eval.graph import rebuild
+
+    log = EventLog(tmp_path / 'events.jsonl')
+    graph = TrustGraph()
+    old = add(log, graph, 'a2', 'write', 'shared.py', 0)
+    read = add(log, graph, 'a1', 'read', 'shared.py', 3)
+    assert graph.reads[0]['write_seq'] == old.seq
+    graph.poison('a0', last_clean_seq=0)
+    late = add(log, graph, 'a0', 'write', 'shared.py', 2)
+    # Receipt sequence is later; actual file execution predates the read.
+    assert late.seq > read.seq
+    assert graph.reads[0]['write_seq'] == late.seq
+    assert next(edge for edge in graph.edges if edge['seq'] == read.seq)['write_seq'] == late.seq
+    assert graph.contacts('a0')[0]['seq'] == read.seq
+    reconstructed = rebuild(log.read())
+    reconstructed.poison('a0', last_clean_seq=0)
+    assert graph.snapshot() == reconstructed.snapshot()
+
+
+def test_contacts_keep_all_versions_and_repeat_poison_preserves_clean_release(tmp_path):
+    log = EventLog(tmp_path / 'events.jsonl')
+    graph = TrustGraph()
+    add(log, graph, 'a0', 'write', 'first.py', 1)
+    first = add(log, graph, 'a1', 'read', 'first.py', 2)
+    add(log, graph, 'a0', 'write', 'second.py', 3)
+    second = add(log, graph, 'a1', 'read', 'second.py', 4)
+    graph.poison('a0', last_clean_seq=0)
+    assert [contact['seq'] for contact in graph.contacts('a0')] == [first.seq, second.seq]
+    graph.release('a1')
+    graph.poison('a0', last_clean_seq=0)
+    assert graph.trust['agent:a1'] == 1

@@ -1,4 +1,4 @@
-"""Shared U6 graph rebuilt only from retained executed file/message versions."""
+"""Shared U6 graph rebuilt from settled effects, including failed file writes."""
 from types import SimpleNamespace
 
 from belowone.graph.trust import TrustGraph
@@ -6,6 +6,9 @@ from belowone.graph.trust import TrustGraph
 
 def record(graph, event):
     if event.kind != 'action_executed':
+        return
+    result = event.payload.get('result', {})
+    if result.get('effects', 'observed' if result.get('ok', True) else 'none') == 'none':
         return
     action = event.payload['action']
     operation = action['operation']
@@ -35,4 +38,12 @@ def rebuild(events):
     graph = TrustGraph()
     for event in events:
         record(graph, event)
+        if event.kind == 'freeze' and 'last_clean_seq' in event.payload:
+            graph.poison(event.agent_id, last_clean_seq=event.payload['last_clean_seq'])
+        elif event.kind == 'release':
+            graph.release(event.agent_id)
+        elif (event.kind == 'action_executed' and event.payload.get('result', {}).get('ok')
+              and event.payload.get('label') == 'clean'
+              and event.payload.get('layer') not in {'off', 'lifecycle'}):
+            graph.last_clean[event.agent_id] = event.seq
     return graph

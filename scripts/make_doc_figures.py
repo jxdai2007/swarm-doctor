@@ -64,10 +64,12 @@ def generate_figures(analysis: dict, out: Path) -> list[Path]:
         if not {"measured_jev", "daily"} <= labels:
             raise ValueError(f"Figure group {group_id}: missing measured_jev/daily delay rows")
 
-    outbreak_count = sum(group["scenario"] == "outbreak" for group in groups.values())
+    outbreak_count = sum(group["scenario"] == "outbreak" and group.get("recorded_arm") == "no-defense"
+                         for group in groups.values())
     paths = []
     for group_id, group in sorted(groups.items()):
-        prefix = "" if group["scenario"] == "outbreak" and outbreak_count == 1 else _group_prefix(group_id)
+        prefix = "" if (group["scenario"] == "outbreak" and group.get("recorded_arm") == "no-defense"
+                        and outbreak_count == 1) else _group_prefix(group_id)
         label_prefix = "SYNTHETIC: " if group["synthetic"] else ""
         metadata = {key: value for key, value in group.items()
                     if key not in {"arms", "curves", "delay"}}

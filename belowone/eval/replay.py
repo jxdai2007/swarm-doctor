@@ -8,6 +8,12 @@ def _elapsed(event):
     return float(event.payload['elapsed'])
 
 
+def _action_time(event):
+    """A settled started tool keeps its effects across a later freeze or kill."""
+    started = event.payload.get('started_at_elapsed') if event.kind == 'action_executed' else None
+    return _elapsed(event) if started is None else float(started)
+
+
 def freeze_windows(freezes=(), controls=()):
     windows = [(agent, float(at), None) for agent, at in freezes]
     active = {}
@@ -63,8 +69,8 @@ def pruned_seqs(events, freezes=(), controls=()):
     """
     windows = freeze_windows(freezes, controls)
     pruned = {event.seq for event in events
-              if any(event.agent_id == agent and _elapsed(event) > start
-                     and (end is None or _elapsed(event) < end)
+              if any(event.agent_id == agent and _action_time(event) > start
+                     and (end is None or _action_time(event) < end)
                      for agent, start, end in windows)}
     changed = True
     while changed:

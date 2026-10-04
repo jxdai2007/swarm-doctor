@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import time
 
 from belowone.events import scrub
+from belowone.eval.decisions import trace_key
 from belowone.eval.graph import record as record_graph
 from belowone.graph.trust import TrustGraph
 from belowone.graph.trace import Tracer
@@ -30,6 +31,8 @@ class Engine:
             raise ValueError('Engine requires distinct known agent IDs')
         self.graph, self.lifecycle = TrustGraph(), Lifecycle(ids)
         self._lock, self._decisions_lock = threading.RLock(), asyncio.Lock()
+        # ponytail: global tracked-file lease; per-resource leases if throughput matters.
+        self._file_io = asyncio.Lock()
         self._changed, self._pending, self._latest = asyncio.Event(), {}, {}
         self._inboxes = {agent: [] for agent in ids}
         self._off = False
@@ -47,8 +50,13 @@ class Engine:
             record_graph(self.graph, event)
             if event.kind in {'freeze', 'release', 'kill'}:
                 self.lifecycle.transition(event.agent_id, event.kind)
-            elif (event.kind == 'decision' and event.payload.get('label') == 'clean'
-                  and event.payload.get('layer') not in {'off', 'lifecycle'}):
+                if event.kind == 'release':
+                    self.graph.release(event.agent_id)
+            if event.kind == 'freeze' and 'last_clean_seq' in event.payload:
+                self.graph.poison(event.agent_id, last_clean_seq=event.payload['last_clean_seq'])
+            if (event.kind == 'action_executed' and event.payload.get('result', {}).get('ok')
+                    and event.payload.get('label') == 'clean'
+                    and event.payload.get('layer') not in {'off', 'lifecycle'}):
                 self.graph.last_clean[event.agent_id] = event.seq
 
     def _elapsed(self, elapsed=None):
@@ -86,20 +94,37 @@ class Engine:
                 raise ValueError('Message content must be a string')
         return result
 
-    def _answer(self, agent, decision_id, action_id, check, *, allow=None, steer=None):
+    def _answer(self, agent, decision_id, action_id, check, *, allow=None, steer=None, proposal=None):
         return {'decision_id': decision_id, 'action_id': action_id,
                 'allow': bool(check.get('allow', False) if allow is None else allow),
                 'label': check.get('label', 'clean'), 'reason': check.get('reason', ''),
                 'state': self.lifecycle.state(agent), 'steer': steer,
                 'confidence': float(check.get('confidence', 0)), 'elapsed': self._elapsed(),
+                'proposal_seq': proposal.seq if proposal is not None else None,
+                'proposal_elapsed': proposal.payload['elapsed'] if proposal is not None else None,
                 'signal': check.get('signal', 'allow'), 'layer': check.get('layer', 'lifecycle'),
                 'uncertain': bool(check.get('uncertain', False))}
+
+    def agent_state(self, agent_id):
+        """Cheap authoritative lifecycle query; never scans the journal."""
+        with self._lock:
+            return {'agent_id': agent_id, 'state': self.lifecycle.state(agent_id)}
+
+    def claimed_actions(self, agent_id):
+        """Outstanding claims for trusted teardown after the tool process stops."""
+        with self._lock:
+            self.lifecycle.state(agent_id)
+            return [{'decision_id': decision_id, 'action': deepcopy(pending['action']),
+                     'started_at': pending['started_at']}
+                    for decision_id, pending in self._pending.items()
+                    if pending['agent'] == agent_id and not pending['recorded']
+                    and 'started_at' in pending]
 
     async def wait_pending_traces(self):
         """Finish observed-contact reviews before a harness starts another model turn."""
         while self._trace_tasks:
             queued = list(self._trace_tasks)
-            await asyncio.gather(*queued)
+            await asyncio.shield(asyncio.gather(*queued))
             self._trace_tasks = [task for task in self._trace_tasks if task not in queued]
 
     async def ready(self, agent_id):
@@ -152,7 +177,9 @@ class Engine:
                 elif check['label'] == 'violation':
                     self.lifecycle.transition(agent_id, 'freeze')
                     self._emit(agent_id, 'freeze', reason=check['reason'], action_id=action_id,
-                               decision_id=decision_id, confirmed=True)
+                               decision_id=decision_id, confirmed=True,
+                               **({'last_clean_seq': min(self.graph.last_clean[agent_id], proposal.seq - 1)}
+                                  if check.get('poisoned') else {}))
                 elif check['label'] == 'drift':
                     self.lifecycle.transition(agent_id, 'steer')
                     steer = f'Goal: {self.spec.goal}. Return to task: {check["reason"]}'
@@ -164,7 +191,7 @@ class Engine:
             if check.get('poisoned') and self.lifecycle.state(agent_id) == 'frozen':
                 await self._trace(agent_id, float(check['confidence']), proposal.seq - 1)
             with self._lock:
-                answer = self._answer(agent_id, decision_id, action_id, check, steer=steer)
+                answer = self._answer(agent_id, decision_id, action_id, check, steer=steer, proposal=proposal)
                 if normalized['operation'] == 'receive' and answer['allow']:
                     answer['messages'] = deepcopy(self._inboxes[agent_id])
                 self._emit(agent_id, 'decision', paths=normalized['paths'], action=normalized,
@@ -175,27 +202,45 @@ class Engine:
                                              'messages': deepcopy(answer.get('messages', []))}
                 return scrub(answer)
 
-    def start(self, agent_id, decision_id):
-        """Claim ticket immediately before tool begins; controls revoke unclaimed tickets.
+    async def start(self, agent_id, decision_id):
+        """Claim immediately before execution; tracked files stay leased until record.
 
-        A kill after a successful claim aborts in-flight work best effort. Record
-        actual completion even if its post-hook arrives after operator control.
+        Controls revoke unclaimed tickets. Claimed tools must settle observed or
+        possible effects even after kill; no timeout can discard a writer receipt.
         """
-        with self._lock:
+        def available():
             self.lifecycle.state(agent_id)
             pending = self._pending.get(decision_id)
             if pending is None or pending['agent'] != agent_id or pending['recorded']:
                 raise ValueError('Unknown or completed action ticket')
-            state = self.lifecycle.state(agent_id)
             allow = pending['answer']['allow'] and self.lifecycle.allowed(agent_id) and 'started_at' not in pending
-            answer = {**pending['answer'], 'allow': bool(allow), 'state': state, 'elapsed': self._elapsed()}
-            if allow:
-                pending['started_at'] = answer['elapsed']
-            else:
-                answer.pop('messages', None)
-                answer['reason'] = f'Agent {state}' if not self.lifecycle.allowed(agent_id) else 'Action ticket unavailable'
-                answer['signal'] = 'kill' if state == 'killed' else 'deny'
-            return scrub(answer)
+            return pending, bool(allow)
+
+        with self._lock:
+            pending, allow = available()
+            tracked_file = pending['action']['operation'] in {'read', 'write'}
+        acquired = False
+        try:
+            if allow and tracked_file:
+                await self._file_io.acquire()
+                acquired = True
+                await self.wait_pending_traces()
+            with self._lock:
+                pending, allow = available()
+                state = self.lifecycle.state(agent_id)
+                answer = {**pending['answer'], 'allow': allow, 'state': state, 'elapsed': self._elapsed()}
+                if allow:
+                    pending['started_at'] = answer['elapsed']
+                    pending['file_lease'] = acquired
+                    acquired = False  # Ownership passes to this ticket's settlement.
+                else:
+                    answer.pop('messages', None)
+                    answer['reason'] = f'Agent {state}' if not self.lifecycle.allowed(agent_id) else 'Action ticket unavailable'
+                    answer['signal'] = 'kill' if state == 'killed' else 'deny'
+                return scrub(answer)
+        finally:
+            if acquired:
+                self._file_io.release()
 
     def _contacts(self, root):
         with self._lock:
@@ -229,6 +274,9 @@ class Engine:
             result = await tracer.trace(agent, last_clean_seq=clean, confidence=certainty)
             queue.extend((confirmed, self._trace_results[confirmed]['confidence'], self.graph.last_clean[confirmed])
                          for confirmed in result['confirmed'])
+            if result['reached'] and self._contacts(agent):
+                visited.discard(agent)
+                queue.append((agent, certainty, clean))
 
     def _trace_emit(self, agent, kind, payload):
         with self._lock:
@@ -254,8 +302,9 @@ class Engine:
             if self.lifecycle.state(agent) in {'killed', 'ended'}:
                 result = {**result, 'uncertain': True}
             self._trace_results[agent] = result
-            self._emit(agent, 'decision', action=action, action_id=f'trace:{agent}:{contact["seq"]}',
-                       decision_id=f'trace:{agent}:{contact["seq"]}', detection=result, trace_review=True,
+            trace_id = trace_key(agent, contact['seq'])
+            self._emit(agent, 'decision', action=action, action_id=trace_id,
+                       decision_id=trace_id, detection=result, trace_review=True,
                        label=result['label'], confidence=result['confidence'], reason=result['reason'])
         return result
 
@@ -274,9 +323,20 @@ class Engine:
             if pending['recorded']:
                 raise ValueError('Decision already recorded')
             answer = pending['answer']
-            if not answer['allow'] and result['ok']:
-                raise ValueError('Denied action cannot report successful execution')
-            kind = 'action_executed' if answer['allow'] and result['ok'] else 'action_denied'
+            effects = result.get('effects', 'observed' if result['ok'] else 'none')
+            if not isinstance(effects, str) or effects not in {'none', 'observed', 'possible'}:
+                raise ValueError('Tool effects must be none, observed or possible')
+            if not answer['allow'] and (result['ok'] or effects != 'none'):
+                raise ValueError('Denied action cannot report successful execution or effects')
+            if 'started_at' not in pending and (result['ok'] or effects != 'none'):
+                raise ValueError('Unstarted action cannot report successful execution or effects')
+            if not result['ok'] and effects != 'none':
+                if normalized['operation'] not in {'read', 'write'}:
+                    raise ValueError('Failed effects require a tracked file action')
+                if normalized['operation'] == 'read' and effects != 'observed':
+                    raise ValueError('Failed read effects require observed content')
+            result = {**result, 'effects': effects}
+            kind = 'action_executed' if result['ok'] or effects != 'none' else 'action_denied'
             paths = list(normalized['paths'])
             if kind == 'action_executed' and normalized['operation'] == 'send':
                 paths = [f'__messages__/{normalized["input"]["recipient"]}/{pending["answer"]["action_id"]}']
@@ -284,16 +344,16 @@ class Engine:
                 paths = [message['path'] for message in pending['messages']]
             event = self._emit(agent_id, kind, paths=paths, elapsed=elapsed, action=normalized,
                                result=result, decision_id=decision_id, action_id=answer['action_id'],
-                               unguarded=answer['layer'] == 'off', started_at_elapsed=pending.get('started_at'))
-            pending['recorded'] = True
+                               unguarded=answer['layer'] == 'off', started_at_elapsed=pending.get('started_at'),
+                               label=answer['label'], layer=answer['layer'])
             if kind == 'action_executed':
-                if normalized['operation'] != 'receive' or paths:
-                    record_graph(self.graph, event)
+                record_graph(self.graph, event)
+                self._latest[agent_id] = {**normalized, 'input': {**normalized['input'], 'observed_result': deepcopy(result)}}
+            if result['ok']:
                 self.detector.tallies.observe(agent_id, normalized, progress=pending['progress'],
                                              cost_usd=result.get('cost_usd', 0))
                 if answer['label'] == 'clean' and answer['layer'] not in {'off', 'lifecycle'}:
                     self.graph.last_clean[agent_id] = event.seq
-                self._latest[agent_id] = {**normalized, 'input': {**normalized['input'], 'observed_result': deepcopy(result)}}
                 if normalized['operation'] == 'send':
                     recipient = normalized['input']['recipient']
                     message = {'sender': agent_id, 'recipient': recipient, 'content': normalized['input']['content'],
@@ -304,6 +364,7 @@ class Engine:
                 elif normalized['operation'] == 'receive':
                     read_paths = set(paths)
                     self._inboxes[agent_id] = [message for message in self._inboxes[agent_id] if message['path'] not in read_paths]
+            if kind == 'action_executed':
                 try:
                     loop = asyncio.get_running_loop()
                 except RuntimeError:
@@ -312,6 +373,10 @@ class Engine:
                     for root in sorted(self._trace_roots):
                         if self._contacts(root):
                             self._trace_tasks.append(loop.create_task(self._trace_after_record(root)))
+            pending['recorded'] = True
+            if pending.get('file_lease'):
+                pending['file_lease'] = False
+                self._file_io.release()
             return event
 
     async def _trace_after_record(self, root):

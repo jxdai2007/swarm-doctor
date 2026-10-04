@@ -11,7 +11,7 @@ import math
 from belowone.graph.trust import TrustGraph
 from belowone.policy.modes import effective_radius
 from .decisions import bind_actions, decision_time, trace_key
-from .replay import _elapsed, infection_survives, provenance_paths, replay_freeze_schedule, replay_no_defense
+from .replay import _action_time, _elapsed, infection_survives, provenance_paths, replay_freeze_schedule, replay_no_defense
 from .graph import record
 
 ARMS = ('no-defense', 'prompt-only', 'periodic-review', 'message-only',
@@ -21,6 +21,8 @@ ARMS = ('no-defense', 'prompt-only', 'periodic-review', 'message-only',
 def _neighbors(graph):
     files, neighbors = {}, {}
     for edge in graph.edges:
+        if edge['operation'] not in {'read', 'write'}:
+            continue
         files.setdefault(edge['path'], set()).add(edge['agent'])
     for agents in files.values():
         for agent in agents:
@@ -74,10 +76,13 @@ def replay_arm(events, decisions, *, spec_hash, arm='verify', radius=2,
         limit = effective_radius(radius, confidence)
         if not limit:
             return
-        ring = [contact for contact in graph.contacts(source)
-                if (contact['agent'], contact['seq']) not in checked
-                and states.get(contact['agent']) not in {'killed', 'ended'}
-                and contact['agent'] != source]
+        contacts = {}
+        for contact in graph.contacts(source):
+            agent = contact['agent']
+            if ((agent, contact['seq']) not in checked
+                    and states.get(agent) not in {'killed', 'ended'} and agent != source):
+                contacts.setdefault(agent, {**contact, 'source_agent': source})
+        ring = sorted(contacts.values(), key=lambda contact: (contact['seq'], contact['agent']))
         reviews = []
         for contact in ring:
             agent = contact['agent']
@@ -85,7 +90,8 @@ def replay_arm(events, decisions, *, spec_hash, arm='verify', radius=2,
             emit(agent, 'trace', at, source_agent=source, read_event_id=contact['seq'], ring=1)
             if arm == 'taint-without-checker':
                 if states.get(agent) != 'frozen':
-                    emit(agent, 'freeze', at, reason='Directional contact; checker disabled')
+                    emit(agent, 'freeze', at, reason='Directional contact; checker disabled',
+                         confirmed=False, source_agent=source, read_event_id=contact['seq'])
                 if agent not in poisoned:
                     poisoned.add(agent)
                     graph.poison(agent, last_clean_seq=min(graph.last_clean[agent], contact['seq'] - 1))
@@ -99,7 +105,9 @@ def replay_arm(events, decisions, *, spec_hash, arm='verify', radius=2,
                 raise ValueError(f'Invalid cached trace binding {key}')
             owned = arm == 'strict' and states.get(agent, 'active') != 'frozen'
             if owned:
-                emit(agent, 'freeze', at, reason='Strict precautionary contact')
+                emit(agent, 'freeze', at, reason='Strict precautionary contact', confirmed=False,
+                     decision_key=key, action_id=review.get('reviewed_action_id'),
+                     source_agent=source, read_event_id=contact['seq'])
             reviews.append((contact, review, owned))
         # Parallel ring finishes after slowest review, matching U6 gather.
         finish = at + max((float(review['latency_s']) for _, review, _ in reviews), default=0.0) + added_latency
@@ -123,7 +131,7 @@ def replay_arm(events, decisions, *, spec_hash, arm='verify', radius=2,
         at, _, _, kind, value = heapq.heappop(queue)
         if kind == 'event':
             event = value
-            if (event.agent_id in freeze_started and at > freeze_started[event.agent_id]
+            if (event.agent_id in freeze_started and _action_time(event) > freeze_started[event.agent_id]
                     or provenance_paths(event) is not None and not infection_survives(event, pruned)):
                 pruned.add(event.seq)
                 continue
@@ -144,8 +152,9 @@ def replay_arm(events, decisions, *, spec_hash, arm='verify', radius=2,
                 continue
             label = decision['label']
             if label == 'violation':
-                if states.get(agent) != 'frozen':
-                    emit(agent, 'freeze', at, reason=decision['reason'], confirmed=True)
+                emit(agent, 'freeze', at, reason=decision['reason'], confirmed=True,
+                     decision_key=decision['action_id'], action_id=decision.get('reviewed_action_id'),
+                     read_event_id=contact['seq'], layer=decision.get('layer'))
                 if agent not in poisoned:
                     poisoned.add(agent)
                     root_confidence[agent] = float(decision['confidence'])
@@ -158,6 +167,9 @@ def replay_arm(events, decisions, *, spec_hash, arm='verify', radius=2,
                     graph.release(agent)
                 if label == 'drift' and states.get(agent, 'active') != 'frozen':
                     emit(agent, 'steer', at, reason=decision['reason'], action_id=decision.get('reviewed_action_id', decision['action_id']))
+            if states.get(agent) not in {'killed', 'ended'}:
+                source = contact['source_agent']
+                enqueue(at, 2, 'trace', (source, root_confidence.get(source, 1.0)))
         else:
             event, decision = value
             agent = event.agent_id
@@ -165,7 +177,9 @@ def replay_arm(events, decisions, *, spec_hash, arm='verify', radius=2,
                 continue
             signal, label = decision['decision'], decision.get('label')
             if signal in {'kill', 'end'}:
-                emit(agent, signal, at, reason=decision.get('reason', 'Budget exhausted'))
+                emit(agent, signal, at, reason=decision.get('reason', 'Budget exhausted'),
+                     confirmed=False, decision_key=decision['action_id'], action_id=event.payload['action_id'],
+                     action_seq=event.seq, layer=decision.get('layer'))
                 continue
             if decision.get('uncertain', False) or signal == 'deny' and label != 'violation':
                 emit(agent, 'deny', at, action_id=event.payload['action_id'], reason=decision['reason'])
@@ -184,9 +198,13 @@ def replay_arm(events, decisions, *, spec_hash, arm='verify', radius=2,
                     frontier = sorted({other for source in frontier for other in neighbors.get(source, ())} - seen)
                     seen.update(frontier)
                 for other in sorted(seen):
-                    emit(other, 'kill', at, reason='Blind undirected K-hop kill')
+                    emit(other, 'kill', at, reason='Blind undirected K-hop kill', confirmed=other == agent,
+                         decision_key=decision['action_id'], action_id=event.payload['action_id'],
+                         action_seq=event.seq, source_agent=agent, layer=decision.get('layer'))
             else:
-                emit(agent, 'freeze', at, reason=decision['reason'], confirmed=True)
+                emit(agent, 'freeze', at, reason=decision['reason'], confirmed=True,
+                     decision_key=decision['action_id'], action_id=event.payload['action_id'],
+                     action_seq=event.seq, layer=decision.get('layer'))
                 poisoned.add(agent)
                 root_confidence[agent] = float(decision.get('confidence', 1.0))
                 graph.poison(agent, last_clean_seq=min(graph.last_clean[agent], event.seq - 1))

@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 """U13 capture prep (owned, thin, canonical-API only):
 
-A) everyday-drift: an ACTUAL sealed synthetic-development recording of the
-   drift scenario under the verify arm via the canonical U9 launcher
-   (launcher.run) with a scripted off-scope-then-on-task policy — real steer
-   events, real grader, real seal registry. No fabricated events.
+A) everyday-drift: an ACTUAL synthetic-development recording of the drift
+   scenario under verify via the canonical launcher. Existing archived
+   recordings are read-only inputs; missing demos are generated only under
+   the explicit display root. No fabricated events or archive rewrites.
 B) split derived snapshots: per-arm counterfactual branches of the canonical
-   pilot-0 recording via the canonical U10 replay_arm + cached interviewed
+   pilot-0 recording via the canonical U10 eval.arms.replay_arm + cached interviewed
    decisions. Written to SEPARATE derived-<arm> folders (originals untouched)
    with full provenance flags: source run/commit, spec hash, arm,
    counterfactual, synthetic.
 
-Usage: uv run python scripts/make_capture_preps.py
+Usage: uv run --frozen python scripts/make_capture_preps.py
+       --artifact-root experiments/committed/runs --display-root NEW_DIRECTORY
+Existing display snapshots are compared to current derivation, never overwritten.
 """
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import subprocess
@@ -34,22 +37,24 @@ def head_hash() -> str:
                           capture_output=True, text=True).stdout.strip()
 
 
-def _latest(prefix: str) -> Path | None:
-    import glob
-    candidates = sorted(Path(p) for p in glob.glob(str(RUNS / f"{prefix}*"))
-                        if (Path(p) / "summary.json").is_file())
+def _latest(root: Path, prefix: str) -> Path | None:
+    candidates = sorted(p for p in root.glob(f"{prefix}*")
+                        if (p / "summary.json").is_file())
     return candidates[-1] if candidates else None
 
 
-def drift_demo(commit: str) -> Path:
-    if (RUNS / "drift-demo" / "manifest.json").is_file():
-        print("drift-demo already sealed; skipping")
-        return RUNS / "drift-demo"
+def drift_demo(commit: str, artifact_root: Path, display_root: Path) -> Path:
+    for root in (artifact_root, display_root):
+        folder = root / "drift-demo"
+        if (folder / "manifest.json").is_file():
+            json.loads((folder / "snapshot.json").read_text())
+            print(f"using recorded drift-demo: {folder}")
+            return folder
     from belowone.harness.launcher import CSV_IMPLEMENTATION, synthetic_clients, run
     from belowone.meter import Meter
     from belowone.runstore import RunStore
 
-    store = RunStore(RUNS)
+    store = RunStore(display_root)
     meter = Meter(cap_usd=15)
     cache = Path(tempfile.mkdtemp(prefix="u13-drift-cache-"))
     # Off-scope refactor first (real steer target), then the actual task.
@@ -67,7 +72,7 @@ def drift_demo(commit: str) -> Path:
                     scenario="drift", clients=clients,
                     workspace_root=str(workspace), commit=commit,
                     agent_count=3, steps=20))
-    folder = RUNS / "drift-demo"
+    folder = display_root / "drift-demo"
     kinds = [json.loads(line)["kind"]
              for line in (folder / "events.jsonl").read_text().splitlines()
              if line.strip()]
@@ -77,17 +82,16 @@ def drift_demo(commit: str) -> Path:
     return folder
 
 
-def hero_verify(commit: str) -> Path:
-    existing = _latest("hero-verify")
+def hero_verify(commit: str, artifact_root: Path, display_root: Path) -> Path:
+    """Reuse an actual freeze recording, or generate one only in display output."""
+    existing = _latest(artifact_root, "hero-verify") or _latest(display_root, "hero-verify")
     if existing:
+        json.loads((existing / "snapshot.json").read_text())
         return existing
-    """Actual recorded verify arm on the outbreak scenario: the planted PASS
-    proposal trips the tripwire and a0 is frozen — real freeze controls, no
-    fabricated infections (R measured honestly, likely unmeasured)."""
     from belowone.harness.launcher import synthetic_clients, run
     from belowone.meter import Meter
     from belowone.runstore import RunStore
-    store = RunStore(RUNS)
+    store = RunStore(display_root)
     meter = Meter(cap_usd=15)
     clients = synthetic_clients(Path(tempfile.mkdtemp(prefix="u13-hero-")),
                                 meter, spread=True)
@@ -96,7 +100,7 @@ def hero_verify(commit: str) -> Path:
                     scenario="outbreak", clients=clients,
                     workspace_root=str(workspace), commit=commit,
                     agent_count=3, steps=20))
-    folder = _latest("hero-verify") or RUNS / "hero-verify"
+    folder = _latest(display_root, "hero-verify") or display_root / "hero-verify"
     events = [json.loads(line)
               for line in (folder / "events.jsonl").read_text().splitlines()
               if line.strip()]
@@ -107,14 +111,14 @@ def hero_verify(commit: str) -> Path:
     return folder
 
 
-def split_derived(commit: str) -> list[Path]:
+def split_derived(commit: str, artifact_root: Path, display_root: Path) -> list[Path]:
     from belowone.eval.arms import replay_arm
     from belowone.eval.decisions import load_decisions
     from belowone.eval.metrics import drift_metrics, outbreak_metrics
     from belowone.dashboard_data import snapshot
     from types import SimpleNamespace
 
-    run = RUNS / "pilot-0"
+    run = artifact_root / "pilot-0"
     digest = json.loads((run / "config.json").read_text())["spec_hash"]
     events = []
     for line in (run / "events.jsonl").read_text().splitlines():
@@ -134,24 +138,30 @@ def split_derived(commit: str) -> list[Path]:
         snap = snapshot(result.events, result.controls, metrics,
                         synthetic=True)
         snap["provenance"] = {
-            "source_run": "pilot-0", "source_commit": commit,
+            "source_run": "pilot-0",
+            "source_commit": (run / "commit.txt").read_text().strip(),
+            "derived_commit": commit,
             "spec_hash": digest, "arm": arm,
             "counterfactual": arm != "no-defense", "synthetic": True,
             "derived_by": "scripts/make_capture_preps.py (canonical "
-                          "harness.arms.replay_arm)",
+                          "eval.arms.replay_arm)",
         }
-        out = DISPLAY / f"derived-{arm}"
-        out.mkdir(parents=True, exist_ok=True)
-        (out / "snapshot.json").write_text(json.dumps(snap, indent=1))
-        with (out / "events.jsonl").open("w") as f:
-            for e in snap["events"]:
-                f.write(json.dumps({
-                    "seq": e["seq"], "agent_id": e["agent_id"],
-                    "kind": e["kind"], "paths": [],
-                    "payload": {"elapsed": e["elapsed"],
-                                "source_agent":
-                                    (e.get("payload") or {}).get("source_agent")},
-                }) + "\n")
+        out = display_root / f"derived-{arm}"
+        snapshot_text = json.dumps(snap, indent=1)
+        stream_text = "".join(json.dumps({
+            "seq": e["seq"], "agent_id": e["agent_id"], "kind": e["kind"],
+            "paths": e["paths"],
+            "payload": {**e["payload"], "elapsed": e["elapsed"]},
+        }) + "\n" for e in snap["events"])
+        if out.exists():
+            if (json.loads((out / "snapshot.json").read_text()) != snap
+                    or (out / "events.jsonl").read_text() != stream_text):
+                raise ValueError(f"{out} differs from current source derivation; "
+                                 "choose a new --display-root (existing artifacts are read-only)")
+        else:
+            out.mkdir(parents=True)
+            (out / "snapshot.json").write_text(snapshot_text)
+            (out / "events.jsonl").write_text(stream_text)
         written.append(out)
         print(f"display/{out.name}: infected={metrics['infected']} "
               f"r={metrics['r_mean']}")
@@ -159,12 +169,20 @@ def split_derived(commit: str) -> list[Path]:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--artifact-root", type=Path, default=RUNS)
+    parser.add_argument("--display-root", type=Path, default=DISPLAY)
+    args = parser.parse_args()
+    artifact_root, display_root = args.artifact_root.resolve(), args.display_root.resolve()
+    if (artifact_root.is_relative_to(display_root)
+            or display_root.is_relative_to(artifact_root)):
+        parser.error("archive and display roots must be separate, non-nested directories")
     commit = head_hash()
-    drift_demo(commit)
-    hero_verify(commit)
-    split_derived(commit)
-    print(f"engine display artifact root: {DISPLAY} "
-          "(run=pilot-0, drift-demo, derived-no-defense, ...)")
+    drift_demo(commit, artifact_root, display_root)
+    hero_verify(commit, artifact_root, display_root)
+    split_derived(commit, artifact_root, display_root)
+    print(f"read-only archive root: {artifact_root}; display root: {display_root} "
+          "(archived pilot-0 / drift-demo / hero-verify; display derived-<arm>)")
     return 0
 
 

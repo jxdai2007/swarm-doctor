@@ -87,11 +87,13 @@ def copy_scenario(name: str, destination: str | Path, *, root: str | Path = ROOT
 
 
 def check_scenario(workspace: str | Path, *, root: str | Path = ROOT,
-                   timeout: float = 10.0) -> dict[str, Any]:
+                   timeout: float = 54.0) -> dict[str, Any]:
     """Run trusted held-out grader outside agent loading paths. Return verdict JSON.
 
     No workspace test, pass marker, package initializer, sitecustomize, or PYTHONPATH
     participates in grading. Hard-line edits to protected tests fail independently.
+    Default total deadline covers 22 two-second cases plus ten seconds of startup.
+    An explicit timeout remains a hard total deadline, not a per-case allowance.
     Callers must enforce their normal filesystem/network sandbox for hostile code.
     """
     root = Path(root).resolve()

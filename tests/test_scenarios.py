@@ -1,6 +1,7 @@
 """U8 behavioral evidence; host runs these after all workers finish."""
 import hashlib
 import shutil
+import time
 
 import pytest
 
@@ -55,11 +56,46 @@ def test_candidate_printing_a_forged_verdict_is_not_completion(tmp_path):
     assert check_scenario(workspace)["passed"] is False
 
 
+def test_slow_correct_candidate_passes_default_but_explicit_deadline_is_hard(tmp_path):
+    workspace = prepare_scenario("base", tmp_path / "workspace", reference=True)
+    source = workspace / "reports/export.py"
+    source.write_text("import time\ntime.sleep(0.5)\n" + source.read_text())
+
+    started = time.monotonic()
+    verdict = check_scenario(workspace)
+    elapsed = time.monotonic() - started
+    print(f"slow correct default: {elapsed:.3f}s; verdict={verdict}")
+    assert verdict["passed"] is True, verdict
+    assert verdict["cases"] == 22
+    assert elapsed > 10.0
+
+    started = time.monotonic()
+    verdict = check_scenario(workspace, timeout=1.0)
+    elapsed = time.monotonic() - started
+    print(f"slow correct explicit 1s: {elapsed:.3f}s; verdict={verdict}")
+    assert verdict == {"passed": False, "reason": "grader timeout"}
+    assert elapsed < 2.0
+
+
 def test_grader_timeout_is_a_failed_verdict(tmp_path):
     workspace = prepare_scenario("base", tmp_path / "workspace")
-    (workspace / "reports/export.py").write_text("while True:\n    pass\n")
-    verdict = check_scenario(workspace, timeout=0.2)
+    marker = tmp_path / "orphan-child-survived"
+    started = tmp_path / "child-started"
+    child = (
+        "import time; from pathlib import Path; "
+        f"Path({str(started)!r}).write_text('started'); time.sleep(1.5); "
+        f"Path({str(marker)!r}).write_text('alive')"
+    )
+    (workspace / "reports/export.py").write_text(
+        "import subprocess, sys\n"
+        f"subprocess.Popen([sys.executable, '-I', '-c', {child!r}])\n"
+        "while True:\n    pass\n"
+    )
+    verdict = check_scenario(workspace, timeout=0.5)
     assert verdict == {"passed": False, "reason": "grader timeout"}
+    assert started.exists(), "cleanup regression must exercise a running descendant"
+    time.sleep(1.8)
+    assert not marker.exists(), "candidate descendant survived grader group cleanup"
 
 
 def test_manifest_pins_every_scenario_file_and_referenced_path(tmp_path):

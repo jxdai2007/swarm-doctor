@@ -24,6 +24,7 @@ async def test_real_detector_decision_record_and_tripwire(tmp_path):
     proposal = action()
     answer = await engine.decide('a0', proposal)
     assert answer['allow'] is True and answer['label'] == 'clean'
+    assert (await engine.start('a0', answer['decision_id']))['allow']
     executed = engine.record('a0', proposal, {'ok': True}, decision_id=answer['decision_id'], elapsed=1.0)
     assert executed.kind == 'action_executed'
     assert engine.snapshot()['graph']['edges'][0]['path'] == 'task.py'
@@ -47,11 +48,18 @@ from belowone.server.api import create_app
 from belowone.server.client import EngineClient, UNREACHABLE
 
 OPERATOR = 'operator-private-capability-123456789'
+AGENT_TOKENS = {agent: f'fixture-{agent}-private-capability-123456789' for agent in ('a0', 'a1', 'a2')}
+
+
+def agent_headers(agent_id):
+    return {'Authorization': f'Bearer {AGENT_TOKENS[agent_id]}'}
 
 
 @asynccontextmanager
-async def serving(engine, **kwargs):
-    app = create_app(engine, operator_token=OPERATOR, **kwargs)
+async def serving(engine, *, agent_tokens=None, **kwargs):
+    tokens = agent_tokens if agent_tokens is not None else {
+        agent: AGENT_TOKENS[agent] for agent in engine.lifecycle.states}
+    app = create_app(engine, operator_token=OPERATOR, agent_tokens=tokens, **kwargs)
     with socket.socket() as listener:
         listener.bind(('127.0.0.1', 0))
         port = listener.getsockname()[1]
@@ -77,12 +85,19 @@ async def test_loopback_http_matches_real_inprocess_decisions(tmp_path):
     async with serving(remote) as client:
         for agent, proposal in [('a0', action()), ('a1', action('read', '.env.production'))]:
             expected = await direct.decide(agent, proposal)
-            response = await client.post('/decide', json={'agent_id': agent, 'action': proposal})
+            response = await client.post('/decide', json={'agent_id': agent, 'action': proposal},
+                                         headers=agent_headers(agent))
             assert response.status_code == 200 and response.json() == expected
             ok = expected['allow']
+            if ok:
+                assert (await direct.start(agent, expected['decision_id']))['allow']
+                claim = await client.post('/start', json={'agent_id': agent,
+                                          'decision_id': expected['decision_id']}, headers=agent_headers(agent))
+                assert claim.status_code == 200 and claim.json()['allow']
             direct.record(agent, proposal, {'ok': ok}, decision_id=expected['decision_id'])
             recorded = await client.post('/record', json={'agent_id': agent, 'action': proposal,
-                                          'result': {'ok': ok}, 'decision_id': expected['decision_id']})
+                                          'result': {'ok': ok}, 'decision_id': expected['decision_id']},
+                                         headers=agent_headers(agent))
             assert recorded.status_code == 200
         assert remote.snapshot()['graph'] == direct.snapshot()['graph']
 
@@ -97,10 +112,11 @@ async def test_operator_controls_require_capability_known_ids_and_off_logs(tmp_p
                                   headers={'Authorization': f'Bearer {OPERATOR}'})).status_code == 400
         answer = await client.post('/control', json=body, headers={'Authorization': f'Bearer {OPERATOR}'})
         assert answer.status_code == 200
-        transport = EngineClient(client=client)
+        transport = EngineClient(agent_token=AGENT_TOKENS['a0'], client=client)
         proposal = action('read', '.env.production')
         decision = await transport.decide('a0', proposal)
         assert decision['allow'] and decision['layer'] == 'off'
+        assert (await transport.start('a0', decision['decision_id']))['allow']
         event = await transport.record('a0', proposal, {'ok': True}, decision_id=decision['decision_id'])
         assert event.payload['unguarded'] is True
         assert OPERATOR not in json.dumps(await transport.snapshot())
@@ -111,7 +127,7 @@ async def test_unreachable_client_is_closed_with_exact_reason():
     with socket.socket() as unused:
         unused.bind(('127.0.0.1', 0))
         port = unused.getsockname()[1]
-    async with EngineClient(f'http://127.0.0.1:{port}', timeout=.1) as client:
+    async with EngineClient(f'http://127.0.0.1:{port}', agent_token=AGENT_TOKENS['a0'], timeout=.1) as client:
         answer = await client.decide('a0', action())
         assert answer['allow'] is False and answer['reason'] == UNREACHABLE
         assert answer['uncertain'] is True
@@ -123,6 +139,7 @@ async def test_fifty_concurrent_decide_record_calls_match_log_graph(tmp_path):
     async def step(index):
         proposal = action(path=f'task{index}.py')
         answer = await engine.decide(f'a{index}', proposal)
+        assert (await engine.start(f'a{index}', answer['decision_id']))['allow']
         return engine.record(f'a{index}', proposal, {'ok': True}, decision_id=answer['decision_id'])
     results = await asyncio.gather(*(step(index) for index in range(50)))
     events = engine.event_log.read()
@@ -153,6 +170,7 @@ async def test_two_loopback_sse_subscribers_receive_same_contiguous_sequence(tmp
         try:
             await asyncio.wait_for(asyncio.gather(*(event.wait() for event in ready)), 3)
             answer = await engine.decide('a0', action())
+            assert (await engine.start('a0', answer['decision_id']))['allow']
             engine.record('a0', action(), {'ok': True}, decision_id=answer['decision_id'])
             assert await asyncio.wait_for(asyncio.gather(*tasks), 3) == [[1, 2, 3], [1, 2, 3]]
         finally:
@@ -237,10 +255,12 @@ async def test_messages_checked_before_delivery_and_read_versions_recorded(tmp_p
     message = {'tool': 'send_message', 'operation': 'send', 'paths': [],
                'input': {'recipient': 'a1', 'content': 'Implement CSV exporter'}}
     answer = await engine.decide('a0', message)
+    assert (await engine.start('a0', answer['decision_id']))['allow']
     written = engine.record('a0', message, {'ok': True}, decision_id=answer['decision_id'])
     inbox = {'tool': 'read_inbox', 'operation': 'receive', 'paths': [], 'input': {}}
     answer = await engine.decide('a1', inbox)
     assert answer['messages'][0]['content'] == message['input']['content']
+    assert (await engine.start('a1', answer['decision_id']))['allow']
     read = engine.record('a1', inbox, {'ok': True}, decision_id=answer['decision_id'])
     assert read.paths == written.paths
     assert engine.snapshot()['graph']['edges'][-1]['write_seq'] == written.seq
@@ -315,6 +335,7 @@ async def test_new_temporal_contact_checks_before_next_turn(tmp_path):
     await engine.decide('a0', action('read', '.env.production'))
     read = action('read', 'shared.py')
     answer = await engine.decide('a1', read)
+    assert (await engine.start('a1', answer['decision_id']))['allow']
     engine.record('a1', read, {'ok': True, 'content': 'CSV helper'}, decision_id=answer['decision_id'])
     resumed = await engine.decide('a1', action())
     assert resumed['allow']
@@ -350,6 +371,7 @@ async def test_step_budget_ends_agent_without_marking_infection(tmp_path):
                     budgets={'steps_per_agent': 1, 'cost_usd': 1}, workspace=tmp_path)
     engine = Engine(spec, EventLog(tmp_path / 'events.jsonl'), Detector(spec, FastFixture()), clock=lambda: 1.)
     answer = await engine.decide('a0', action())
+    assert (await engine.start('a0', answer['decision_id']))['allow']
     engine.record('a0', action(), {'ok': True}, decision_id=answer['decision_id'])
     ended = await engine.decide('a0', action())
     assert ended['state'] == 'ended' and not ended['allow']
@@ -361,7 +383,7 @@ async def test_malformed_success_response_is_fail_closed():
                'label': 'clean', 'confidence': .9}
     async with httpx.AsyncClient(base_url='http://127.0.0.1', transport=httpx.MockTransport(
             lambda request: httpx.Response(200, json=invalid))) as http:
-        client = EngineClient(client=http)
+        client = EngineClient(agent_token=AGENT_TOKENS['a0'], client=http)
         answer = await client.decide('a0', action())
         assert not answer['allow'] and answer['reason'] == UNREACHABLE
 
@@ -375,7 +397,8 @@ async def test_kill_http_and_sse_notify_before_blocked_checker_finishes(tmp_path
             return await super().check(state, questions)
     engine = make_engine(tmp_path, fast=SlowFast())
     async with serving(engine) as client:
-        decision = asyncio.create_task(client.post('/decide', json={'agent_id': 'a0', 'action': action()}))
+        decision = asyncio.create_task(client.post('/decide', json={'agent_id': 'a0', 'action': action()},
+                                                    headers=agent_headers('a0')))
         await asyncio.wait_for(entered.wait(), 2)
         ready = asyncio.Event()
         async def killed():
@@ -407,7 +430,7 @@ async def test_outstanding_ticket_cannot_begin_real_tool_after_operator_control(
     engine = make_engine(tmp_path)
     output = tmp_path / 'task.py'
     async with serving(engine) as http:
-        client = EngineClient(client=http)
+        client = EngineClient(agent_token=AGENT_TOKENS['a0'], client=http)
         proposal = action()
         ticket = await client.decide('a0', proposal)
         assert ticket['allow']
@@ -434,7 +457,7 @@ async def test_real_tool_completed_before_control_is_truthfully_recorded_after(t
     proposal = action()
     now[0] = 1
     ticket = await engine.decide('a0', proposal)
-    assert engine.start('a0', ticket['decision_id'])['allow']
+    assert (await engine.start('a0', ticket['decision_id']))['allow']
     (tmp_path / 'task.py').write_text('completed real tool')
     now[0] = 2
     completed_at = now[0]
@@ -476,9 +499,84 @@ async def test_off_actions_never_create_checker_trust_live_or_journal_rebuild(tm
     await engine.control('a0', 'off')
     proposal = action('write', 'unchecked.py')
     answer = await engine.decide('a0', proposal)
-    engine.start('a0', answer['decision_id'])
+    assert (await engine.start('a0', answer['decision_id']))['allow']
     engine.record('a0', proposal, {'ok': True}, decision_id=answer['decision_id'])
     assert engine.graph.last_clean['a0'] == 0
     rebuilt = make_engine(tmp_path)
     assert rebuilt.graph.last_clean['a0'] == 0
     assert rebuilt.graph.writes['unchecked.py']
+
+
+@pytest.mark.parametrize('endpoint', ['ready', 'decide', 'start', 'record', 'state'])
+async def test_agent_http_capabilities_reject_impersonation_before_effects(tmp_path, endpoint):
+    engine = make_engine(tmp_path)
+    proposal = action()
+    body = {'agent_id': 'a0'}
+    if endpoint in {'decide', 'record'}:
+        body['action'] = proposal
+    if endpoint in {'start', 'record'}:
+        ticket = await engine.decide('a0', proposal)
+        body['decision_id'] = ticket['decision_id']
+    if endpoint == 'record':
+        assert (await engine.start('a0', ticket['decision_id']))['allow']
+        body['result'] = {'ok': True}
+    async with serving(engine) as http:
+        async def request(agent='a0', headers=None):
+            if endpoint == 'state':
+                return await http.get(f'/state/{agent}', headers=headers)
+            return await http.post(f'/{endpoint}', json={**body, 'agent_id': agent}, headers=headers)
+
+        before = engine.event_log.path.read_bytes() if engine.event_log.path.exists() else b''
+        for headers, status in [
+                (None, 401),
+                ({'Authorization': 'Basic invalid'}, 401),
+                ({'Authorization': 'Bearer wrong'}, 403),
+                ({'Authorization': f'Bearer {OPERATOR}'}, 403),
+                (agent_headers('a1'), 403)]:
+            assert (await request(headers=headers)).status_code == status
+        assert (await request('unknown', agent_headers('a0'))).status_code == 403
+        after = engine.event_log.path.read_bytes() if engine.event_log.path.exists() else b''
+        assert after == before and engine.lifecycle.state('a0') == 'active'
+        authorized = await request(headers=agent_headers('a0'))
+        assert authorized.status_code == 200
+        if endpoint == 'state':
+            assert authorized.json() == {'agent_id': 'a0', 'state': 'active'}
+        elif endpoint == 'record':
+            assert authorized.json()['kind'] == 'action_executed'
+        else:
+            assert authorized.json()['allow'] is True
+        if endpoint == 'start':
+            engine.record('a0', proposal, {'ok': False}, decision_id=ticket['decision_id'])
+
+
+async def test_authenticated_client_agent_flow_and_authoritative_state(tmp_path):
+    engine = make_engine(tmp_path)
+    async with serving(engine) as http:
+        client = EngineClient(agent_token=AGENT_TOKENS['a0'], client=http)
+        assert (await client.ready('a0'))['allow']
+        proposal = action()
+        answer = await client.decide('a0', proposal)
+        assert answer['allow']
+        assert (await client.start('a0', answer['decision_id']))['allow']
+        event = await client.record('a0', proposal, {'ok': True}, decision_id=answer['decision_id'])
+        assert event.kind == 'action_executed' and engine.graph.writes['task.py']
+        assert (await http.post('/control', json={'agent_id': 'a0', 'command': 'kill'},
+                               headers=agent_headers('a0'))).status_code == 403
+        await engine.control('a0', 'freeze')
+        assert await client.state('a0') == {'agent_id': 'a0', 'state': 'frozen'}
+        assert not (await client.ready('a1'))['allow']
+        with pytest.raises(httpx.HTTPStatusError):
+            await client.state('a1')
+        snapshot = await client.snapshot()
+        serialized = json.dumps(snapshot) + engine.event_log.path.read_text()
+        assert all(token not in serialized for token in [OPERATOR, *AGENT_TOKENS.values()])
+
+
+@pytest.mark.parametrize('tokens', [
+    {}, {'a0': 'short', 'a1': AGENT_TOKENS['a1'], 'a2': AGENT_TOKENS['a2']},
+    {**AGENT_TOKENS, 'a1': AGENT_TOKENS['a0']},
+    {**AGENT_TOKENS, 'a0': OPERATOR}, {**AGENT_TOKENS, 'unknown': 'unknown-capability-123456789'},
+])
+def test_app_rejects_missing_weak_shared_or_operator_agent_capabilities(tmp_path, tokens):
+    with pytest.raises(ValueError, match='capabilit'):
+        create_app(make_engine(tmp_path), operator_token=OPERATOR, agent_tokens=tokens)

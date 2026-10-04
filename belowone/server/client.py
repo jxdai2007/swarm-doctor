@@ -1,4 +1,4 @@
-"""Agent transport has no operator capability and always fails closed."""
+"""Agent-scoped Bearer transport, no operator capability; decisions fail closed."""
 from __future__ import annotations
 
 import math
@@ -10,7 +10,11 @@ UNREACHABLE = 'Below One engine unreachable'
 
 
 class EngineClient:
-    def __init__(self, base_url='http://127.0.0.1:8765', *, timeout=2.0, client=None):
+    def __init__(self, base_url='http://127.0.0.1:8765', *, agent_token, timeout=2.0, client=None):
+        if not isinstance(agent_token, str) or len(agent_token) < 24 or not agent_token.isascii() or any(
+                character.isspace() for character in agent_token):
+            raise ValueError('Agent token must be a private Bearer capability of at least 24 characters')
+        self._headers = {'Authorization': f'Bearer {agent_token}'}
         url = httpx.URL(base_url)
         if url.scheme != 'http' or url.host not in {'localhost', '127.0.0.1', '::1'}:
             raise ValueError('Engine transport must be local HTTP')
@@ -28,7 +32,7 @@ class EngineClient:
 
     async def _ask(self, endpoint, payload):
         try:
-            response = await self.client.post(endpoint, json=payload)
+            response = await self.client.post(endpoint, json=payload, headers=self._headers)
             response.raise_for_status()
             answer = response.json()
             if (not isinstance(answer, dict) or type(answer.get('allow')) is not bool
@@ -47,12 +51,17 @@ class EngineClient:
 
     async def record(self, agent_id, action, result, *, decision_id, elapsed=None):
         response = await self.client.post('/record', json={'agent_id': agent_id, 'action': action,
-            'result': result, 'decision_id': decision_id, 'elapsed': elapsed})
+            'result': result, 'decision_id': decision_id, 'elapsed': elapsed}, headers=self._headers)
         response.raise_for_status()
         return Event.from_dict(response.json())
 
+    async def state(self, agent_id):
+        response = await self.client.get(f'/state/{agent_id}', headers=self._headers)
+        response.raise_for_status()
+        return response.json()
+
     async def snapshot(self):
-        response = await self.client.get('/snapshot')
+        response = await self.client.get('/snapshot', headers=self._headers)
         response.raise_for_status()
         return response.json()
 

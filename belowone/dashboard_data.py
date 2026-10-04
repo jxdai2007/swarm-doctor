@@ -25,6 +25,9 @@ def agent_state(events, controls=()) -> dict[str, str]:
         a = getattr(ev, "agent_id", None)
         if a and a not in agents:
             agents[a] = "clean"
+    for control in controls:
+        if control.get("agent_id"):
+            agents.setdefault(control["agent_id"], "clean")
     for a in infected:
         agents[a] = "infected"
     for a in frozen:
@@ -81,18 +84,21 @@ def snapshot(events, controls, outbreak: dict, drift: dict | None = None,
             continue
         edges.append({"source": write["agent"], "target": edge["agent"],
                       "path": edge["path"], "seq": edge["seq"],
+                      "elapsed": edge["elapsed"],
                       "operation": "write->read"})
     return {
         "synthetic": synthetic,
+        "last_seq": max((ev.seq for ev in events), default=0),
         "agents": agent_state(kept, controls),
         "edges": edges,
         "counters": counters(outbreak, drift),
         "controls": [
             {"seq": f"C{c.get('order', i)}",
              "agent_id": c.get("agent_id"), "kind": c.get("kind"),
-             "elapsed": c.get("elapsed")}
+             "elapsed": c.get("elapsed"), "order": c.get("order", i)}
             for i, c in enumerate(sorted(controls,
-                                         key=lambda c: c.get("elapsed", 0)))
+                                         key=lambda c: (c.get("elapsed", 0),
+                                                        c.get("order", 0))))
         ],
         "time_since_poisoning_s": min(
             ((ev.payload or {}).get("elapsed") for ev in kept
@@ -105,6 +111,6 @@ def snapshot(events, controls, outbreak: dict, drift: dict | None = None,
               "paths": list(getattr(ev, "paths", []) or []),
               "payload": copy.deepcopy(ev.payload or {})}
              for ev in kept],
-            key=lambda e: e["elapsed"] or 0,
+            key=lambda e: (e["elapsed"] or 0, e["seq"]),
         ),
     }

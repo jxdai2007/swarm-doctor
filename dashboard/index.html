@@ -84,12 +84,46 @@
     font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-dim); }
   .panel .pcount b { color: var(--ink); }
   a.mode { color: var(--accent); font-size: 13px; text-decoration: none; }
+  #connection-status { color: var(--ink-dim); font-size: 13px; }
+  #connection-status[data-disconnected="true"] { color: #ffd27a; }
+  button { background: var(--panel); color: var(--ink); border: 1px solid var(--hairline);
+    border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible, input:focus-visible, #graph-wrap:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 3px;
+  }
   @media (max-width: 720px) {
-    main { flex-direction: column; }
-    aside { max-width: none; border-left: 0; border-top: 1px solid var(--hairline); }
-    #graph-wrap { min-height: 320px; }
-    #split { flex-direction: column; }
-    .panel { border-right: 0; border-bottom: 1px solid var(--hairline); }
+    body { height: auto; min-height: 100%; }
+    header { flex-wrap: wrap; gap: 8px 12px; }
+    #synthetic-badge { margin-left: 0; }
+    main { flex: none; flex-direction: column; }
+    aside {
+      flex: none; max-width: none; border-left: 0;
+      border-top: 1px solid var(--hairline);
+    }
+    #ticker { max-height: 260px; }
+    #graph-wrap {
+      flex: none; height: 360px; min-height: 320px;
+      overflow-x: auto; overflow-y: hidden;
+    }
+    #graph { min-width: 720px; }
+    #graph-wrap::before {
+      content: "Scroll horizontally to inspect the graph";
+      position: sticky; left: 12px; top: 8px; z-index: 1;
+      color: var(--ink-dim); font-size: 12px; pointer-events: none;
+    }
+    #split { flex: none; flex-direction: column; overflow: visible; }
+    .panel {
+      flex: none; border-right: 0; border-bottom: 1px solid var(--hairline);
+    }
+    .panel .graph { flex: none; height: 320px; }
+    #timeline {
+      flex: none; position: sticky; bottom: 0; z-index: 2;
+      height: auto; min-height: 44px; flex-wrap: wrap;
+      padding: 8px 12px; gap: 8px; background: var(--ground);
+    }
+    .r24 { flex-basis: 100%; max-width: 100%; overflow-x: auto; }
+    #scrub { min-width: 120px; }
   }
 </style>
 </head>
@@ -98,12 +132,15 @@
   <h1>Below One</h1>
   <span class="tag" id="run-name">loading run…</span>
   <a class="mode" href="?mode=split" id="mode-link">split view</a>
+  <span id="connection-status" role="status" aria-live="polite">Connecting…</span>
+  <button id="reconnect" type="button" hidden>Reconnect</button>
   <span id="synthetic-badge">SYNTHETIC DEV — fixture replay, not live evidence</span>
 </header>
 <main>
-  <div id="graph-wrap"><div id="graph"></div></div>
+  <div id="graph-wrap" tabindex="0" role="region"
+       aria-label="Live agent graph. Scroll horizontally on narrow screens."><div id="graph"></div></div>
   <aside>
-    <section><h2>Counters</h2><div id="counters"></div></section>
+    <section><h2 id="counter-heading">Counters</h2><div id="counters"></div></section>
     <section style="flex:1;display:flex;flex-direction:column;min-height:0">
       <h2>Event log</h2><div id="ticker"></div>
     </section>
@@ -113,10 +150,10 @@
 <div id="timeline">
   <span id="r24" class="r24"></span>
   <span id="clock">t = 0.0s (task start)</span>
-  <input id="scrub" type="range" min="0" max="1000" value="0">
+  <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Replay time">
 </div>
 <script src="vendor/cytoscape.min.js?v=27"></script>
-<script src="live.js?v=27"></script>
-<script src="split.js?v=27"></script>
+<script src="live.js?v=28"></script>
+<script src="split.js?v=28"></script>
 </body>
 </html>

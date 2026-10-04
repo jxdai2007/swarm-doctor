@@ -127,18 +127,18 @@ async def cmd_interview(args) -> int:
         spec_out = out.resolve().as_posix()  # outside workspace: tripwire fail
     examples = iv.generate_examples(spec_dict, scan, spec_out=spec_out)
 
-    shown_key: list = []
+    shown_key: str | None = None
 
     async def show_verdicts():
+        nonlocal shown_key
         spec = iv.GoalSpec.from_dict(spec_dict, workspace=root)
         key = json.dumps(spec_dict, sort_keys=True)
-        if key == (shown_key[0] if shown_key else None):
+        if key == shown_key:
             return  # already shown for this exact spec; no duplicate checks
         verdicts = await iv.dry_run(spec, cache, examples, clients,
                                     spec_path=spec_out)
         _print_verdicts(verdicts)
-        shown_key.clear()
-        shown_key.append(key)
+        shown_key = key
 
     await show_verdicts()
 

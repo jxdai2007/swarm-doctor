@@ -29,20 +29,23 @@ def _text(x, y, s, size=11, fill="#e8edf2", anchor="start"):
 
 def epidemic_curve(per_arm: dict[str, list[tuple[float, int]]], *,
                    width=640, height=360) -> tuple[str, str]:
-    """Cumulative infections over time per arm. per_arm: arm -> [(t, count)]."""
+    """Cumulative infections over time, with full arm names below the plot.
+    Requested dimensions are minima; the legend can grow the canvas."""
     t_max = max((t for series in per_arm.values() for t, _ in series), default=1) or 1
     y_max = max((c for series in per_arm.values() for _, c in series), default=1) or 1
     colors = ["#6fb4ff", "#ff5d5d", "#4ecf8d", "#ffd27a", "#c792ea"]
+    width = max(width, 72 + max((len(arm) * 10 * 0.65
+                                 for arm in per_arm), default=0))
     body = [_line([(0, height - 40), (width - 60, height - 40)], "#2a333d")]
     body.append(_line([(40, 20), (40, height - 40)], "#2a333d"))
     for frac in (0.25, 0.5, 0.75, 1.0):
         gy = (height - 40) - frac * (height - 70)
         gv = y_max * frac
         body.append(_line([(36, gy), (44, gy)], "#2a333d"))
-        body.append(_text(32, gy + 4, f"{gv:.0f}", 9, "#9fb0bf", "end"))
+        body.append(_text(32, gy + 4, f"{gv:g}", 9, "#9fb0bf", "end"))
     for frac in (0.25, 0.5, 0.75, 1.0):
         gx = 40 + frac * (width - 110)
-        body.append(_text(gx, height - 26, f"{t_max * frac:.0f}s", 9,
+        body.append(_text(gx, height - 26, f"{t_max * frac:.3g}s", 9,
                           "#9fb0bf", "middle"))
     for i, (arm, series) in enumerate(sorted(per_arm.items())):
         pts = [(40 + (t / t_max) * (width - 110),
@@ -50,11 +53,12 @@ def epidemic_curve(per_arm: dict[str, list[tuple[float, int]]], *,
                for t, c in series]
         color = colors[i % len(colors)]
         body.append(_line(pts, color))
-        legend_y = 30 + 14 * i
-        body.append(f'<rect x="{width - 200}" y="{legend_y - 9}" width="10" '
+        legend_y = height + 14 * i
+        body.append(f'<rect x="40" y="{legend_y - 9}" width="10" '
                     f'height="3" fill="{color}"/>')
-        body.append(_text(width - 184, legend_y, arm[:28], 10))
-    return _svg(width, height, "".join(body)), json.dumps(
+        body.append(_text(56, legend_y, arm, 10))
+    canvas_h = height + 14 * len(per_arm) + 10
+    return _svg(width, canvas_h, "".join(body)), json.dumps(
         {"per_arm": per_arm, "t_max": t_max, "y_max": y_max},
         sort_keys=True, separators=(",", ":"))
 
@@ -83,22 +87,26 @@ def delay_damage(points: list[dict], *, width=640, height=360) -> tuple[str, str
 def r_bar(per_arm: dict[str, dict], *, width=640, height=360) -> tuple[str, str]:
     """R per arm (mean + CI whiskers when measured) against the line at R=1.
     A measured mean with unmeasured CI (single run) draws the bar honestly
-    without invented whiskers; the data sidecar records ci_measured."""
+    without invented whiskers. Full labels and measurement notes occupy their
+    own rows; requested dimensions are minima, not text clipping bounds."""
     arms = sorted(k for k, v in per_arm.items() if v.get("mean") is not None)
     unmeasured = sorted(k for k, v in per_arm.items() if v.get("mean") is None)
-    hi = [v.get("ci95", [v["mean"]])[-1] for v in per_arm.values()
-          if v.get("mean") is not None and v.get("ci95")]
-    r_max = max([1.0] + [h if h is not None else v["mean"]
-                         for v, h in zip(
-                             [v for v in per_arm.values()
-                              if v.get("mean") is not None], hi)])
-    plot_w, plot_h = width - 110, height - 70
+    r_max = max([1.0] + [per_arm[arm]["mean"] for arm in arms]
+                + [bound for arm in arms for bound in (per_arm[arm].get("ci95") or [])
+                   if bound is not None])
+    notes = [f"{arm}: CI unmeasured (single run)" for arm in arms
+             if not per_arm[arm].get("ci95")]
+    notes += [f"{arm}: R unmeasured (zero infections)" for arm in unmeasured]
+    label_w = max((len(arm) * 9 * 0.65 + 24 for arm in arms), default=0)
+    width = max(width, 110 + len(arms) * label_w,
+                80 + max((len(note) * 10 * 0.65 for note in notes), default=0))
+    plot_w, plot_h = width - 110, height - 90
 
     def y(r):
         return (height - 40) - (r / r_max) * plot_h
 
     body = [_line([(40, y(1.0)), (40 + plot_w, y(1.0))], "#ffd27a", 1)]
-    body.append(_text(44, y(1.0) - 4, "R = 1 (containment line)", 10, "#ffd27a"))
+    body.append(_text(40, 20, "R = 1 (containment line)", 10, "#ffd27a"))
     bar_w = plot_w / max(len(arms), 1)
     for i, arm in enumerate(arms):
         v = per_arm[arm]
@@ -110,17 +118,13 @@ def r_bar(per_arm: dict[str, dict], *, width=640, height=360) -> tuple[str, str]
         body.append(f'<rect x="{cx - bar_w * 0.3:.2f}" y="{mean_y:.2f}" '
                     f'width="{bar_w * 0.6:.2f}" height="{height - 40 - mean_y:.2f}" '
                     f'fill="#6fb4ff" fill-opacity="0.35"/>')
-        body.append(_text(cx, height - 24, arm[:20], 9, "#e8edf2", "middle"))
+        body.append(_text(cx, height - 24, arm, 9, "#e8edf2", "middle"))
         body.append(_text(cx, mean_y - 8, f'{v["mean"]:.2f}', 10, "#6fb4ff",
                           "middle"))
-        if not v.get("ci95"):
-            body.append(_text(cx, mean_y - 20, "CI unmeasured (single run)",
-                              9, "#9fb0bf", "middle"))
-    for j, arm in enumerate(unmeasured):
-        body.append(_text(40, 30 + 14 * j,
-                          f"{arm}: R unmeasured (zero infections)", 10,
-                          "#9fb0bf"))
-    return _svg(width, height, "".join(body)), json.dumps(
+    for j, note in enumerate(notes):
+        body.append(_text(40, height + 14 * j, note, 10, "#9fb0bf"))
+    canvas_h = height + 14 * len(notes) + 10
+    return _svg(width, canvas_h, "".join(body)), json.dumps(
         {"per_arm": per_arm}, sort_keys=True, separators=(",", ":"))
 
 

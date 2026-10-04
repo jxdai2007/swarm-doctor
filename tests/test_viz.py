@@ -2,6 +2,8 @@
 import json
 import xml.etree.ElementTree as ET
 
+import pytest
+
 from belowone.viz import figures
 from belowone.viz.cards import cites_metrics, drift_card, outbreak_card
 from belowone.viz.receipts import extract_provenance, receipt, render
@@ -48,6 +50,118 @@ def test_r_bar_draws_containment_line_and_unmeasured():
     assert "R = 1" in svg
     assert "prevented: R unmeasured" in svg
     assert json.loads(data)["per_arm"]["verify"]["mean"] == 0.0
+
+
+SVG = "{http://www.w3.org/2000/svg}"
+
+
+def _text_box(node):
+    """Conservative monospace cell bounds, including baseline descent."""
+    size = float(node.attrib["font-size"])
+    width = len(node.text or "") * size * 0.65
+    x, y = float(node.attrib["x"]), float(node.attrib["y"])
+    anchor = node.attrib["text-anchor"]
+    left = x - (width / 2 if anchor == "middle" else width if anchor == "end" else 0)
+    return left, y - size, left + width, y + size * 0.25
+
+
+def _assert_readable_text(root, nodes):
+    width, height = float(root.attrib["width"]), float(root.attrib["height"])
+    boxes = [_text_box(node) for node in nodes]
+    for left, top, right, bottom in boxes:
+        assert 0 <= left < right <= width
+        assert 0 <= top < bottom <= height
+    for i, (left, top, right, bottom) in enumerate(boxes):
+        for other_left, other_top, other_right, other_bottom in boxes[i + 1:]:
+            assert (right <= other_left or other_right <= left
+                    or bottom <= other_top or other_bottom <= top)
+
+
+def test_r_bar_full_labels_and_caption_have_separate_visible_geometry():
+    per_arm = {
+        "SYNTHETIC: no-defense": {"mean": 0.5, "ci95": [0.0, 1.0]},
+        "SYNTHETIC: periodic-review": {"mean": 0.0, "ci95": [0.0, 0.0]},
+        "SYNTHETIC: verify & isolate": {"mean": None, "ci95": None},
+        "SYNTHETIC: " + "long-arm-name-" * 8: {"mean": 0.75, "ci95": None},
+    }
+    svg, data = figures.r_bar(per_arm)
+    root = ET.fromstring(svg)
+    texts = root.findall(f"{SVG}text")
+    assert {arm for arm, value in per_arm.items() if value["mean"] is not None} <= {
+        node.text for node in texts}
+    assert "SYNTHETIC: verify & isolate: R unmeasured (zero infections)" in {
+        node.text for node in texts}
+    _assert_readable_text(root, texts)
+    caption = next(node for node in texts if node.text.startswith("R = 1"))
+    bars = [node for node in root.findall(f"{SVG}rect")
+            if node.attrib.get("fill-opacity") == "0.35"]
+    assert _text_box(caption)[3] < min(float(bar.attrib["y"]) for bar in bars)
+    assert json.loads(data)["per_arm"] == per_arm
+    assert figures.r_bar(dict(reversed(list(per_arm.items())))) == (svg, data)
+
+
+def test_epidemic_full_legend_is_visible_and_outside_plot():
+    per_arm = {
+        "SYNTHETIC: periodic-review": [(0, 0), (25, 2)],
+        "SYNTHETIC: verify & isolate " + "long-arm-" * 12: [(0, 0), (25, 0)],
+    }
+    svg, data = figures.epidemic_curve(per_arm)
+    root = ET.fromstring(svg)
+    legend = [node for node in root.findall(f"{SVG}text") if node.text in per_arm]
+    assert {node.text for node in legend} == set(per_arm)
+    _assert_readable_text(root, root.findall(f"{SVG}text"))
+    plot_bottom = max(float(point.split(",")[1])
+                      for line in root.findall(f"{SVG}polyline")
+                      for point in line.attrib["points"].split())
+    assert min(_text_box(node)[1] for node in legend) > plot_bottom
+    markers = [node for node in root.findall(f"{SVG}rect") if "x" in node.attrib]
+    assert len(markers) == len(legend)
+    for marker, label in zip(markers, legend):
+        assert float(marker.attrib["x"]) + float(marker.attrib["width"]) < _text_box(label)[0]
+    assert json.loads(data)["per_arm"] == {
+        arm: [list(point) for point in series] for arm, series in per_arm.items()}
+
+
+def test_epidemic_subsecond_and_fractional_ticks_are_distinct():
+    svg, data = figures.epidemic_curve({"observed": [(0, 0), (0.06, 3)]})
+    root = ET.fromstring(svg)
+    texts = root.findall(f"{SVG}text")
+    x_ticks = [node.text for node in texts if node.attrib["text-anchor"] == "middle"]
+    y_ticks = [node.text for node in texts if node.attrib["text-anchor"] == "end"]
+    assert x_ticks == ["0.015s", "0.03s", "0.045s", "0.06s"]
+    assert y_ticks == ["0.75", "1.5", "2.25", "3"]
+    _assert_readable_text(root, texts)
+    payload = json.loads(data)
+    assert payload["t_max"] == 0.06 and payload["y_max"] == 3
+
+
+@pytest.mark.parametrize("per_arm", [
+    {"single": {"mean": 9.0, "ci95": None}},
+    {"missing-first": {"mean": 9.0, "ci95": None},
+     "measured": {"mean": 2.0, "ci95": [1.0, 3.0]}},
+    {"measured": {"mean": 2.0, "ci95": [1.0, 3.0]},
+     "missing-last": {"mean": 9.0}},
+    {"own-bound-below-mean": {"mean": 9.0, "ci95": [1.0, 3.0]}},
+])
+def test_r_bar_every_mean_scales_visible_plot_independently(per_arm):
+    svg, data = figures.r_bar(per_arm)
+    root = ET.fromstring(svg)
+    bars = [node for node in root.findall(f"{SVG}rect")
+            if node.attrib.get("fill-opacity") == "0.35"]
+    assert len(bars) == len(per_arm)
+    for bar in bars:
+        x, y = float(bar.attrib["x"]), float(bar.attrib["y"])
+        width, height = float(bar.attrib["width"]), float(bar.attrib["height"])
+        assert 0 <= x < x + width <= float(root.attrib["width"])
+        assert 0 < y < y + height < float(root.attrib["height"])
+    highest = min(bars, key=lambda bar: float(bar.attrib["y"]))
+    bottom = float(highest.attrib["y"]) + float(highest.attrib["height"])
+    threshold = next(node for node in root.findall(f"{SVG}polyline")
+                     if node.attrib["stroke"] == "#ffd27a")
+    threshold_y = float(threshold.attrib["points"].split()[0].split(",")[1])
+    assert float(highest.attrib["height"]) / (bottom - threshold_y) == pytest.approx(9.0)
+    _assert_readable_text(root, root.findall(f"{SVG}text"))
+    assert json.loads(data)["per_arm"] == per_arm
 
 
 def test_cards_values_trace_to_metrics_keys():

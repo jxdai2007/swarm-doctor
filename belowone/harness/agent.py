@@ -27,7 +27,7 @@ async def while_alive(awaitable, engine, agent_id):
     task = asyncio.create_task(awaitable)
     try:
         while not task.done():
-            if engine.snapshot()['states'][agent_id] in {'killed', 'ended'}:
+            if engine.agent_state(agent_id)['state'] in {'killed', 'ended'}:
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
                 raise asyncio.CancelledError('Agent terminated')
