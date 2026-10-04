@@ -216,6 +216,18 @@ def admin_command(tool, command, cwd):
     return None
 
 
+def plausible_path(candidate, cwd):
+    """Interpreter args: count dotted words as paths only if they look like real files."""
+    if "/" in candidate or candidate.startswith("~") or any(c in candidate for c in "*?"):
+        return True
+    if any(fnmatch.fnmatchcase(candidate.lower(), p) for p in SECRET_GLOBS):
+        return True
+    try:
+        return normalized(candidate, cwd).exists()
+    except (OSError, RuntimeError, ValueError):
+        return True
+
+
 def shell_paths(command, cwd):
     """Return (literal path, cwd, read|write) triples and whether shell is risky."""
     tokens = shell_tokens(command)
@@ -373,6 +385,8 @@ def shell_paths(command, cwd):
         risky = True
         for arg in args:
             for candidate in re.findall(r"(?:[\w.*?~/-]+/)?[\w.*?~-]+(?:\.[\w.*?~-]+)+|(?:\.{1,2}|~)?/[\w./*?~-]+", arg):
+                if not plausible_path(candidate, current):
+                    continue  # e.g. `s.replace` / `os.path` inside inline code is not a file
                 add(candidate, "read")
                 add(candidate, "write")
             if arg in (".", "..") or any(fnmatch.fnmatchcase(arg.lower(), p) for p in SECRET_GLOBS):

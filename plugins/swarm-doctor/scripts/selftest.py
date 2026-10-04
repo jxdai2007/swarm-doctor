@@ -130,6 +130,16 @@ class DoctorTests(unittest.TestCase):
         events = [json.loads(line) for line in (self.root / ".swarm-doctor/events.jsonl").read_text().splitlines()]
         self.assertTrue(all("timestamp" in item for item in events))
 
+    def test_inline_code_not_paths(self):
+        """inline code attributes are not file paths"""
+        for command in ("python3 -c \"s = 'a'; print(s.replace('a', 'b'))\"",
+                        "python3 -c \"import os, json; print(os.path.join('x', 'y'), json.dumps({}))\""):
+            self.assertIsNone(self.hook(self.payload(tool="Bash", path=command)), command)
+        self.assertDecision(self.payload(tool="Bash", path="python3 -c \"open('tests/test_reports.py').read()\""),
+                            reason="Protected by Swarm Doctor")
+        self.assertDecision(self.payload(tool="Bash", path="python3 -c \"print(open('.env.production').read())\"", agent="leaker"),
+                            reason="Protected by Swarm Doctor")
+
     def test_bash_paths_and_directions(self):
         """Bash paths; reads versus writes"""
         allowed = ("cat README.md", "cat -n reports/source.txt", "head -n 2 reports/source.txt",
