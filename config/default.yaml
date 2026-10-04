@@ -35,6 +35,7 @@ openrouter:
   fallback_prompt_price: '0.000000021'
   fallback_completion_price: '0.0000000616'
   fallback_context_limit: 262144
+  fallback_reasoning_enabled: false
 jev:
   model: typesafe/jev-1.13
   timeout_seconds: 10.0

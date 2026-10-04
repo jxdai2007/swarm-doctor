@@ -198,6 +198,7 @@ def live_clients(cache, meter):
                                     prompt_price=settings['openrouter']['fallback_prompt_price'],
                                     completion_price=settings['openrouter']['fallback_completion_price'],
                                     context_limit=settings['openrouter'].get('fallback_context_limit', 131072),
+                                    reasoning_enabled=settings['openrouter'].get('fallback_reasoning_enabled'),
                                     concurrency=3, requests_per_window=settings['kimi']['requests_per_window'],
                                     max_quota_wait_seconds=0),
                    JevClient(router_key, meter, cassette, http=http, concurrency=3,
