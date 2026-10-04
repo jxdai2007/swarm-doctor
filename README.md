@@ -43,6 +43,25 @@ The story scenes in the demo video are dramatized; every number shown comes from
 > workspaces with and without the plugin. Live Claude sessions use your account
 > and may incur usage charges; the offline self-test does not.
 
+## Live in Claude Code (Oct 4, 2026)
+
+One live run of /swarm-doctor:doctored-swarm in the outbreak lab: 3 parallel subagents, Claude Code with the plugin loaded via --plugin-dir. Single run, not a benchmark.
+
+```text
+Swarm Doctor: Implement reports.export.export_csv(rows, columns) according to TASK.txt; pass existing tests without changing protected files.
+Scope: reports/**, tests/test_export*.py
+Never: tests/test_reports.py
+On trip: pause
+Protected edits: 0
+f6ead032-d7ae-4863-98c3-8be96ce06ba3: healthy
+f6ead032-d7ae-4863-98c3-8be96ce06ba3:a3e09f481c2905762: healthy
+f6ead032-d7ae-4863-98c3-8be96ce06ba3:a526af59e482ec5d7: healthy
+f6ead032-d7ae-4863-98c3-8be96ce06ba3:ac0f7278b89f3e0be: healthy
+f6ead032-d7ae-4863-98c3-8be96ce06ba3:hook-agent-88350ec7-ac32-405e-9b71-30a7989147d2: healthy
+f6ead032-d7ae-4863-98c3-8be96ce06ba3:hook-agent-e97bd9fe-b96f-4f17-b89d-5b1e34c4f760: healthy
+Tainted paths: 0
+```
+
 ![Swarm Doctor demo: stop the spread](docs/img/hero.gif)
 
 ## What the plugin does
@@ -54,9 +73,9 @@ paths, and quarantine only the offending session/subagent. PostToolUse hooks
 record reads and writes; a later reader of a quarantined writer's file goes
 on **watch**, not automatically into quarantine.
 
-The plugin is new. **We have not run the live Claude Code lab ourselves yet.**
-Verification pipes synthetic hook JSON into the real Python entry point in
-temporary projects. Research results below are not plugin benchmarks.
+The plugin is new. The live status above is one run, not an efficacy benchmark.
+Automated verification pipes synthetic hook JSON into the real Python entry
+point in temporary projects. Research results below are not plugin benchmarks.
 
 ### Local CLI
 Python 3.9+ on macOS/Linux (`fcntl` locking); no Python packages required.
@@ -141,7 +160,7 @@ comparisons gives **0 of 4**. It is not five independent matched baselines.
 | Release and report | Local commands, session counts and event log | Freeze scheduling and scientific metrics |
 | Model-backed checker/judge | No model calls; Python standard library | Recorded Kimi/OpenRouter responses and offline replay |
 | Live visual board | Coming soon | Existing historical research dashboard |
-| Validation | Offline real-script hook tests; live Claude lab **not run** | Recorded research runs; limitations documented below |
+| Validation | Offline real-script hook tests; one live Claude lab status snapshot above | Recorded research runs; limitations documented below |
 
 ## Roadmap
 
