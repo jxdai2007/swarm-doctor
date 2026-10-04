@@ -1,21 +1,45 @@
 {
-  "board": {"run": "injected-kimi-101-no-defense", "synthetic": false,
-            "note": "LIVE RECORDING — injected-compromise no-defense run (scripted P0 + 4 real peers), served kimi-for-coding",
-            "allow_absent": false},
-  "catch": {"run": "injected-kimi-101-no-defense", "synthetic": false,
-            "note": "LIVE RECORDING — scripted patient-zero infection present; NO peer secondary infections and no defense catch: R/containment denominators scripted-only",
-            "allow_absent": true},
-  "freeze": {"run": "injected-kimi-101-no-defense", "synthetic": false,
-             "note": "LIVE RECORDING — no freeze occurred (no-defense arm; containment unmeasured)",
-             "allow_absent": true},
-  "steer": {"run": "injected-kimi-101-no-defense", "synthetic": false,
-            "note": "LIVE RECORDING — steering untested (no-defense arm; no drift scenario)",
-            "allow_absent": true},
-  "split": {"synthetic": false, "unmeasured": true,
-            "note": "LIVE SERVER — live arm comparison not run (paired triplet in progress); panels show unavailable"},
-  "charts": {"synthetic": false, "mode": "counterfactual-replay",
-             "runs": ["injected-kimi-101-no-defense"],
-             "note": "cached-policy counterfactual arms over the sealed injected-compromise recording"},
-  "receipt": {"synthetic": false, "mode": "actual", "run": "injected-kimi-101-no-defense",
-              "note": "recorded no-defense receipt; counterfactual=false"}
+  "board": {
+    "run": "injected-kimi-101-no-defense",
+    "synthetic": false,
+    "note": "LIVE RECORDING \u2014 injected-compromise no-defense run (scripted P0 + 4 real peers), served kimi-for-coding",
+    "allow_absent": false
+  },
+  "catch": {
+    "run": "injected-kimi-101-verify",
+    "synthetic": false,
+    "note": "LIVE RECORDING \u2014 verify arm: scripted P0 infected then frozen (actual containment observed on the injected-compromise run); peer secondary reported from sealed counts only",
+    "allow_absent": false
+  },
+  "freeze": {
+    "run": "injected-kimi-101-verify",
+    "synthetic": false,
+    "note": "LIVE RECORDING \u2014 actual freeze observed (scripted P0 contained); peer infection reduction NOT claimed (P0 was scripted)",
+    "allow_absent": false
+  },
+  "steer": {
+    "run": "injected-kimi-101-no-defense",
+    "synthetic": false,
+    "note": "LIVE RECORDING \u2014 steering untested (no-defense arm; no drift scenario)",
+    "allow_absent": true
+  },
+  "split": {
+    "synthetic": false,
+    "unmeasured": true,
+    "note": "LIVE SERVER \u2014 live arm comparison not run (paired triplet in progress); panels show unavailable"
+  },
+  "charts": {
+    "synthetic": false,
+    "mode": "counterfactual-replay",
+    "runs": [
+      "injected-kimi-101-no-defense"
+    ],
+    "note": "cached-policy counterfactual arms over the sealed injected-compromise recording"
+  },
+  "receipt": {
+    "synthetic": false,
+    "mode": "actual",
+    "run": "injected-kimi-101-no-defense",
+    "note": "recorded no-defense receipt; counterfactual=false"
+  }
 }
