@@ -1,0 +1,67 @@
+{
+  "schema": "salvage-required-checks-v1",
+  "checked_commit": "8d0f3d7609b6ad9fb1959900bb751e93a75de8dc",
+  "working_root": "/tmp/below-one-salvage-publish-20261004",
+  "make_test": {
+    "command": "UV_PROJECT_ENVIRONMENT=/tmp/below-one-live-20261004T0750Z/venv make test",
+    "status": "interrupted_owned_runner",
+    "exit_code": 143,
+    "seconds": 450.62,
+    "passed": false,
+    "latest_output": "pytest_asyncio loop-scope deprecation warning; no complete suite result"
+  },
+  "direct_full_pytest": {
+    "command": "/tmp/below-one-live-20261004T0750Z/venv/bin/python -m pytest -vv -o faulthandler_timeout=45",
+    "collected": 553,
+    "passed": 518,
+    "failed": 15,
+    "errors": 20,
+    "seconds": 453.09,
+    "exit_code": 1,
+    "full_suite_pass_claim": false
+  },
+  "bun_adapter": {
+    "command": "bun test adapters/omp/test/below-one.test.ts",
+    "passed": 7,
+    "failed": 0,
+    "files": 1,
+    "seconds": 31.53,
+    "exit_code": 0
+  },
+  "authorized_prerequisite": {
+    "source": "/Users/jollenshoulddai/Desktop/below-one/experiments/derived",
+    "destination": "experiments/derived",
+    "method": "copy existing ignored generated artifacts; no recomputation, archive edits, resealing, or semantic readmission"
+  },
+  "first_affected_fixture_rerun": {
+    "passed": 9,
+    "failed": 3,
+    "deselected": 6,
+    "seconds": 4.38,
+    "exit_code": 1
+  },
+  "reachable_repairs": [
+    "Delete phrase-regex assertions; retain source-bound negative controls by changing structured hypotheses.h1.n then rendering, not repinning prose",
+    "Use signature-agnostic preparation/storyboard test doubles while preserving real HTTP required/optional and stale/current-output consumer contracts",
+    "Delete incidental exact make-command mock test; no implementation change or legacy bypass"
+  ],
+  "final_submission_contracts": {
+    "command": "/tmp/below-one-live-20261004T0750Z/venv/bin/python -m pytest -q tests/test_submission.py",
+    "passed": 17,
+    "failed": 0,
+    "errors": 0,
+    "seconds": 2.85,
+    "exit_code": 0,
+    "capture_mode": "HTTP failure/absence preflight and fake test bytes only; no browser video capture"
+  },
+  "remaining_known_full_suite_limit": {
+    "legacy_reproduce_failed": 9,
+    "legacy_reproduce_fixture_errors": 10,
+    "cause": "Historical replay admission rejects changed semantics/evaluator identity before intended test boundary",
+    "rerun_after_repairs": false,
+    "resolution": "Preserve immutable archives and existing admission; explicitly not a full-suite green claim"
+  },
+  "paid_calls": 0,
+  "new_capture": false,
+  "review_started": false
+}

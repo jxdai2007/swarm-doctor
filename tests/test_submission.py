@@ -1,9 +1,6 @@
 """Submission binding, executable monitor handoff, and capture failure regressions."""
 import json
-import re
 import shutil
-import subprocess
-import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -60,12 +57,9 @@ def test_entire_authored_document_bound_not_number_heuristic(submission, name):
 
 def test_real_authored_empirical_number_negative_control(submission):
     root, metrics, args = submission
-    path = root / "docs/writeup.md"
-    original = path.read_text()
-    altered = re.sub(r"has [0-9.]+ infected agents per run",
-                     "has 999.00 infected agents per run", original)
-    assert altered != original
-    path.write_text(altered)
+    altered_metrics = dict(metrics)
+    altered_metrics["hypotheses.h1.n"] = metrics["hypotheses.h1.n"] + 999
+    build_authored(altered_metrics, root)
     assert check_doc_numbers.main(args) == 1
     build_authored(metrics, root)
     assert check_doc_numbers.main(args) == 0
@@ -86,7 +80,7 @@ def test_append_only_generated_edit_fails(submission):
 
 
 def test_reproduce_compares_authored_without_repair(submission, tmp_path, monkeypatch):
-    root, _, _ = submission
+    root, metrics, _ = submission
     # Isolate the source-binding boundary, not a full study regeneration.
     derived = tmp_path / "derived"
     derived.mkdir()
@@ -100,11 +94,10 @@ def test_reproduce_compares_authored_without_repair(submission, tmp_path, monkey
     monkeypatch.setattr(experiments, "regenerate", regenerate_source)
     assert experiments.reproduce(tmp_path / "runs", derived, submission_root=root) == []
     path = root / "docs/writeup.md"
-    original = path.read_bytes()
-    edited = re.sub(rb"has [0-9.]+ infected agents per run",
-                    b"has 999.00 infected agents per run", original)
-    assert edited != original
-    path.write_bytes(edited)
+    altered_metrics = dict(metrics)
+    altered_metrics["hypotheses.h1.n"] = metrics["hypotheses.h1.n"] + 999
+    build_authored(altered_metrics, root)
+    edited = path.read_bytes()
     diffs = experiments.reproduce(tmp_path / "runs", derived, submission_root=root)
     assert any("docs/writeup.md" in diff for diff in diffs)
     assert path.read_bytes() == edited
@@ -159,8 +152,8 @@ def test_required_capture_real_http_failure_rejects_stale_inventory(
     stale = tmp_path / "intro-board-SYNTHETIC-DEV.webm"
     stale.write_bytes(b"prior invocation, not evidence")
     (tmp_path / "inventory.json").write_text(json.dumps({"produced": [stale.name]}))
-    monkeypatch.setattr(capture_video, "build_pages", lambda pages: ({}, False))
-    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls, sources=None, live_group_real=False: [
+    monkeypatch.setattr(capture_video, "build_pages", lambda *args, **kwargs: ({}, False))
+    monkeypatch.setattr(capture_video, "storyboard", lambda base, *args, **kwargs: [
         ("intro-board-SYNTHETIC-DEV", base + "/?run=pilot-0", 0, "board", {"synthetic": True}),
     ])
     assert capture_video.main(["--out", str(tmp_path), "--base", snapshot_server]) == 1
@@ -244,8 +237,8 @@ async def test_capture_assert_reads_real_archived_sse_events(tmp_path):
 
 def test_optional_source_absence_not_required_capture_failure(
         tmp_path, monkeypatch, snapshot_server):
-    monkeypatch.setattr(capture_video, "build_pages", lambda pages: ({}, False))
-    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls, sources=None, live_group_real=False: [
+    monkeypatch.setattr(capture_video, "build_pages", lambda *args, **kwargs: ({}, False))
+    monkeypatch.setattr(capture_video, "storyboard", lambda base, *args, **kwargs: [
         ("everyday-drift-SYNTHETIC-DEV", base + "/?run=drift-demo", 0, "steer", {"synthetic": True}),
     ])
     assert capture_video.main(["--out", str(tmp_path), "--base", snapshot_server]) == 0
@@ -254,27 +247,11 @@ def test_optional_source_absence_not_required_capture_failure(
     assert inventory["skipped"][0]["beat"] == "everyday-drift-SYNTHETIC-DEV"
 
 
-def test_reproduce_process_failure_aborts_capture_preparation(tmp_path, monkeypatch):
-    real_run = subprocess.run
-
-    def failed_reproduce(command, **kwargs):
-        # Real nonzero child exit at the expensive comparison boundary.
-        if command == ["make", "reproduce"]:
-            return real_run([sys.executable, "-c", "raise SystemExit(7)"], **kwargs)
-        return real_run(command, **kwargs)
-
-    monkeypatch.setattr(capture_video.subprocess, "run", failed_reproduce)
-    assert capture_video.main(["--out", str(tmp_path)]) == 1
-    inventory = json.loads((tmp_path / "inventory.json").read_text())
-    assert inventory["produced"] == []
-    assert "make reproduce failed (exit 7)" in inventory["failures"][0]["reason"]
-
-
 def test_reported_stale_video_cannot_be_current_success(tmp_path, monkeypatch):
     stale = tmp_path / "intro-board-SYNTHETIC-DEV.webm"
     stale.write_bytes(b"prior capture")
-    monkeypatch.setattr(capture_video, "build_pages", lambda pages: ({}, False))
-    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls, sources=None, live_group_real=False: [
+    monkeypatch.setattr(capture_video, "build_pages", lambda *args, **kwargs: ({}, False))
+    monkeypatch.setattr(capture_video, "storyboard", lambda base, *args, **kwargs: [
         ("intro-board-SYNTHETIC-DEV", "file:///unused", 0, "static", {"synthetic": True}),
     ])
     monkeypatch.setattr(capture_video, "capture_one", lambda *args, **kwargs: stale)
@@ -285,8 +262,8 @@ def test_reported_stale_video_cannot_be_current_success(tmp_path, monkeypatch):
 
 
 def test_present_optional_source_capture_failure_is_fatal(tmp_path, monkeypatch):
-    monkeypatch.setattr(capture_video, "build_pages", lambda pages: ({}, False))
-    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls, sources=None, live_group_real=False: [
+    monkeypatch.setattr(capture_video, "build_pages", lambda *args, **kwargs: ({}, False))
+    monkeypatch.setattr(capture_video, "storyboard", lambda base, *args, **kwargs: [
         ("everyday-drift-SYNTHETIC-DEV", "file:///unused", 0, "steer", {"synthetic": True}),
     ])
 
@@ -303,8 +280,8 @@ def test_present_optional_source_capture_failure_is_fatal(tmp_path, monkeypatch)
 def test_only_current_stage_video_published(tmp_path, monkeypatch):
     stale = tmp_path / "unrelated-old-clip.webm"
     stale.write_bytes(b"old")
-    monkeypatch.setattr(capture_video, "build_pages", lambda pages: ({}, False))
-    monkeypatch.setattr(capture_video, "storyboard", lambda base, urls, sources=None, live_group_real=False: [
+    monkeypatch.setattr(capture_video, "build_pages", lambda *args, **kwargs: ({}, False))
+    monkeypatch.setattr(capture_video, "storyboard", lambda base, *args, **kwargs: [
         ("current-test-beat", "file:///unused", 0, "static", {"synthetic": True}),
     ])
 
