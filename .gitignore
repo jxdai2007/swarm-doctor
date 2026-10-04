@@ -11,3 +11,5 @@ node_modules/
 .DS_Store
 /runs/
 /experiments/derived/
+/experiments/display/
+/clips/_pages/
