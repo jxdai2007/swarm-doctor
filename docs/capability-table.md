@@ -21,4 +21,5 @@ Notes:
 - The adapter contract (U12): one oh-my-pi process per agent, every tool call
   preceded by `/decide`, results recorded via `/record`, operator `/control`
   with Bearer capability, `/start` ticket claimed immediately before tool
-  delivery.
+  delivery. Agent routes require independent agent-scoped Bearer capabilities;
+  the operator capability is separate.

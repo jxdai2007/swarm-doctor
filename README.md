@@ -28,10 +28,9 @@ uv run python -m belowone.cli interview \
 make demo   # live 3-agent swarm; needs .env with KIMI/OPENROUTER keys
 make demo-offline   # SYNTHETIC DEV board without keys
 
-# 3. watch the live board
-uv run python scripts/serve_engine_smoke.py 8899   # dev harness; adapter
-                                                   # serves this in production
-open "http://127.0.0.1:8899/?run=live"
+# 3. watch the native adapter board while make demo is running
+# Open BOARD_URL printed by the native launcher in your browser.
+# The demo owns this server; do not launch an unrelated smoke engine here.
 ```
 
 `make demo` fails loudly until the oh-my-pi adapter and model keys are in
@@ -62,6 +61,9 @@ recordings exist (R33).
 
 ```bash
 make test          # offline python tests (+ omp adapter TS suite when present)
-make reproduce     # regenerate metrics from committed artifacts, byte-diff
-make check-docs    # every number in generated docs must match its source
+make reproduce     # comparison-only: rebuild in temporary storage and byte-diff
+make check-docs    # full authored documents and generated metrics must match
+# After an intentional source/template or operator-label change only:
+make regenerate    # publish derived outputs and source-bound submission docs
+make reproduce     # compare without changing published artifacts
 ```

@@ -29,10 +29,16 @@ engine before execution (fail-closed, KTD9).
   start, never embedded in static assets, never placed in agent environment or
   model input). `/control` (freeze/release/kill/end/off) requires it as a
   Bearer credential; agents cannot revoke each other's tickets.
+- Each agent receives an independent launch-issued Bearer capability.
+  `/ready`, `/decide`, `/start`, `/record`, `/state/{agent_id}`, and native
+  model/finish routes validate that capability for the named agent. Agent
+  credentials never authorize operator controls or another agent.
 - `/start` claims an action ticket immediately before tool delivery; operator
   controls revoke unclaimed tickets; a kill after a successful claim aborts
-  in-flight tool work **best effort** — a tool already past the delivery
-  boundary may complete outside engine sight.
+  in-flight tool work. Tracked file reads/writes hold a claim-through-receipt
+  lease; failed or cancelled writes record observed or possible effects
+  conservatively without claiming tool success. Shell and off-tool effects
+  remain outside this guarantee.
 - The locked spec file and run artifacts are protected resources: writing to
   them is itself a violation; run artifacts are sealed and verified
   (U2), and the public API allowlists only explicit artifact files.

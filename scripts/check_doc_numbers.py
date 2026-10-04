@@ -1,106 +1,80 @@
 #!/usr/bin/env python3
-"""KTD14 doc-number check (U17): regenerate the metric-derived docs from the
-committed metrics artifacts and byte-compare against the committed files.
-Any edited number fails with the differing file (and line, when the doc has
-one). Exit 0 = every number is source-bound.
+"""Byte-compare full authored documents and generated metrics against sources.
 
-Usage: uv run python scripts/check_doc_numbers.py [--docs docs/generated]
+Regenerate intentionally with ``make regenerate``; this checker never repairs
+or rewrites published files. Missing source metrics fail closed.
 """
 from __future__ import annotations
 
 import argparse
+import glob
+import re
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from belowone.viz.doc_templates import build_docs, load_metrics  # noqa: E402
+from belowone.viz.doc_templates import (  # noqa: E402
+    AUTHORED_TEMPLATES, build_docs, compare_authored, load_metrics,
+)
+
+
+def check_links(root: Path) -> list[str]:
+    failures = []
+    for name in AUTHORED_TEMPLATES:
+        path = root / name
+        if not path.is_file():
+            continue  # full-document comparison reports missing files
+        text = path.read_text()
+        for target in re.findall(r"\]\(([^)]+)\)", text):
+            if target.startswith(("http://", "https://", "mailto:")):
+                continue
+            clean = target.split("#", 1)[0]
+            if clean and not (path.parent / clean).resolve().exists():
+                failures.append(f"{name}: broken link {target}")
+        if name == "docs/writeup.md" and (
+                "[unmeasured]" not in text or "[SYNTHETIC DEV]" not in text):
+            failures.append(f"{name}: missing explicit scientific status markers")
+        if name == "docs/video-script.md":
+            for clip in set(re.findall(r"clips/[\w./-]+\.webm", text)):
+                if not (root / clip).is_file():
+                    failures.append(f"{name}: missing clip {clip}")
+    return failures
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--metrics-glob", default="experiments/derived/analysis.json")
     parser.add_argument("--docs", default="docs/generated")
+    parser.add_argument("--root", type=Path, default=ROOT,
+                        help="Submission root containing the five authored documents")
     args = parser.parse_args(argv)
-
-    import glob as globmod
+    root = args.root.resolve()
     pattern = args.metrics_glob
-    metric_files = sorted(Path(p) for p in globmod.glob(pattern)) \
-        if Path(pattern.split("/*")[0]).is_absolute() \
-        else sorted(ROOT.glob(pattern))
+    metric_files = sorted(Path(p) for p in glob.glob(
+        pattern if Path(pattern).is_absolute() else str(root / pattern)))
     if not metric_files:
-        # aggregate tokens require real metric sources; defer the
-        # generated-doc byte check and still run authored-doc checks.
-        print("note: no metric sources matched --metrics-glob; "
-              "generated-doc byte check deferred, authored-doc checks "
-              "still run")
-    metrics = load_metrics(metric_files) if metric_files else {}
+        print("DOC_DIFF: no metric sources matched --metrics-glob")
+        return 1
     docs = Path(args.docs)
     if not docs.is_absolute():
-        docs = ROOT / docs
-    regenerated = docs / ".regen"
-    failures = []
-    if metric_files:
-        generated_applied = True
-        written = build_docs(metrics, regenerated)
-        for path in written:
-            committed = docs / path.name
-            if not committed.is_file():
-                failures.append(f"{committed}: missing (regenerate and commit "
-                                "via scripts/check_doc_numbers.py --write)")
-            elif committed.read_bytes() != path.read_bytes():
-                for lineno, (a, b) in enumerate(zip(
-                        committed.read_text().splitlines(),
-                        path.read_text().splitlines()), 1):
-                    if a != b:
-                        failures.append(f"{committed}:{lineno}: committed "
-                                        f"{a.strip()!r} != regenerated "
-                                        f"{b.strip()!r}")
-                        break
+        docs = root / docs
+    try:
+        metrics = load_metrics(metric_files)
+        failures = compare_authored(metrics, root)
+        with tempfile.TemporaryDirectory(prefix="belowone-doc-check-") as temporary:
+            for path in build_docs(metrics, Path(temporary)):
+                committed = docs / path.name
+                if not committed.is_file() or committed.read_bytes() != path.read_bytes():
+                    failures.append(f"{committed}: missing or byte-different generated document")
+        failures.extend(check_links(root))
+    except (KeyError, ValueError, OSError) as error:
+        failures = [f"invalid source or document: {error}"]
+    for failure in failures:
+        print("DOC_DIFF:", failure)
     if failures:
-        for f in failures:
-            print("DOC_DIFF:", f)
-        return 1
-
-    # --- authored docs (README, writeup, threat model, capability, script) --
-    import re as _re
-    authored = [ROOT / "README.md", ROOT / "docs" / "writeup.md",
-                ROOT / "docs" / "threat-model.md",
-                ROOT / "docs" / "capability-table.md",
-                ROOT / "docs" / "video-script.md"]
-    for path in authored:
-        if not path.is_file():
-            failures.append(f"{path.relative_to(ROOT)}: missing")
-            continue
-        text = path.read_text()
-        # (a) unrendered metric tokens must not survive into authored prose
-        for token in _re.findall(r"\{[a-z0-9-]+\.[a-z0-9_.]+\}", text):
-            failures.append(f"{path.relative_to(ROOT)}: unrendered metric "
-                            f"token {token}")
-        # (b) markdown links to repo files must resolve
-        for target in _re.findall(r"\]\(([^)]+)\)", text):
-            if target.startswith(("http://", "https://")):
-                continue
-            clean = target.split("#")[0]
-            if clean and not (path.parent / clean).resolve().exists() \
-                    and not (ROOT / clean).exists():
-                failures.append(f"{path.relative_to(ROOT)}: broken link "
-                                f"{target}")
-        # (c) the writeup must carry explicit unmeasured/synthetic markers
-        if path.name == "writeup.md":
-            if "[unmeasured]" not in text or "[SYNTHETIC DEV]" not in text:
-                failures.append("docs/writeup.md: missing explicit "
-                                "[unmeasured]/[SYNTHETIC DEV] markers")
-        # (d) video-script clip references must exist on disk
-        if path.name == "video-script.md":
-            for clip in set(_re.findall(r"clips/[\w.-]+\.webm", text)):
-                if not (ROOT / clip).is_file():
-                    failures.append(f"docs/video-script.md: clip {clip} "
-                                    "does not exist")
-    if failures:
-        for f in failures:
-            print("DOC_DIFF:", f)
         return 1
     print("DOC_SOURCES_VERIFIED")
     return 0

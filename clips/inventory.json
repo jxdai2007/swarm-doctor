@@ -1,0 +1,76 @@
+{
+  "invocation": "c0fbc8c51aa341a2b5cfead6080b4d78",
+  "started": "2026-10-04T01:55:40.160159+00:00",
+  "synthetic": true,
+  "produced": [
+    {
+      "beat": "intro-board-SYNTHETIC-DEV",
+      "file": "intro-board-SYNTHETIC-DEV.webm",
+      "seconds": 10,
+      "bytes": 878463
+    },
+    {
+      "beat": "scripted-interview-SYNTHETIC-DEV",
+      "file": "scripted-interview-SYNTHETIC-DEV.webm",
+      "seconds": 15,
+      "bytes": 992617
+    },
+    {
+      "beat": "live-catch-SYNTHETIC-DEV",
+      "file": "live-catch-SYNTHETIC-DEV.webm",
+      "seconds": 15,
+      "bytes": 1011621
+    },
+    {
+      "beat": "split-race-SYNTHETIC-DEV",
+      "file": "split-race-SYNTHETIC-DEV.webm",
+      "seconds": 20,
+      "bytes": 1163493
+    },
+    {
+      "beat": "hero-freeze-SYNTHETIC-DEV",
+      "file": "hero-freeze-SYNTHETIC-DEV.webm",
+      "seconds": 20,
+      "bytes": 1027216
+    },
+    {
+      "beat": "everyday-drift-SYNTHETIC-DEV",
+      "file": "everyday-drift-SYNTHETIC-DEV.webm",
+      "seconds": 20,
+      "bytes": 1183895
+    },
+    {
+      "beat": "charts-SYNTHETIC-DEV",
+      "file": "charts-SYNTHETIC-DEV.webm",
+      "seconds": 10,
+      "bytes": 305172
+    },
+    {
+      "beat": "receipt-SYNTHETIC-DEV",
+      "file": "receipt-SYNTHETIC-DEV.webm",
+      "seconds": 10,
+      "bytes": 299753
+    },
+    {
+      "beat": "reproduce-proof-SYNTHETIC-DEV",
+      "file": "reproduce-proof-SYNTHETIC-DEV.webm",
+      "seconds": 15,
+      "bytes": 398382
+    },
+    {
+      "beat": "threat-SYNTHETIC-DEV",
+      "file": "threat-SYNTHETIC-DEV.webm",
+      "seconds": 5,
+      "bytes": 285401
+    },
+    {
+      "beat": "repo-close-SYNTHETIC-DEV",
+      "file": "repo-close-SYNTHETIC-DEV.webm",
+      "seconds": 5,
+      "bytes": 271006
+    }
+  ],
+  "skipped": [],
+  "failures": [],
+  "status": "complete"
+}

@@ -30,7 +30,9 @@ Current committed artifacts are synthetic fixture recordings
 (`experiments/committed/`). The metric values they produce are visible in
 [docs/generated/README-metrics.md](generated/README-metrics.md) and the
 outbreak receipts; they demonstrate that the pipeline computes and binds
-numbers, and are NOT evidence about real model swarms.
+numbers, and are NOT evidence about real model swarms. The no-defense
+fixture aggregate has **2.00 infected agents per run**
+([SYNTHETIC DEV]; source: `analysis.json/doc_metrics/no-defense/metrics.infected`).
 
 ## Hypotheses (R30) — status
 
