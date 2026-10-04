@@ -1,0 +1,13 @@
+{
+  "name": "swarm-doctor",
+  "owner": {
+    "name": "Jollen Dai"
+  },
+  "plugins": [
+    {
+      "name": "swarm-doctor",
+      "source": "./plugins/swarm-doctor",
+      "description": "Lock a coding task, steer scope drift, and quarantine actors that touch protected paths."
+    }
+  ]
+}

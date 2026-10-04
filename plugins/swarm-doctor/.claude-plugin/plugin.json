@@ -1,0 +1,9 @@
+{
+  "name": "swarm-doctor",
+  "version": "0.1.0",
+  "description": "Stop the spread: task-scope and protected-path tripwires for Claude Code swarms.",
+  "author": {
+    "name": "Jollen Dai"
+  },
+  "repository": "https://github.com/jxdai2007/swarm-doctor"
+}
