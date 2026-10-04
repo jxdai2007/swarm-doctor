@@ -6,6 +6,12 @@ The story scenes in the demo video are dramatized; every number shown comes from
 
 > ## Try it in 2 minutes
 >
+> **Fastest, 30 seconds, no Claude or keys:** watch the doctor handle a simulated swarm.
+>
+> ```bash
+> git clone https://github.com/jxdai2007/swarm-doctor && cd swarm-doctor && python3 try.py
+> ```
+>
 > In Claude Code, add this marketplace, then install the plugin:
 >
 > ```text
