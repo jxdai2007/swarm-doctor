@@ -73,6 +73,12 @@ async def campaign(args):
                         if state not in {'killed', 'ended'}:
                             await active_engine.control(agent, 'kill', 'Owned campaign deadline/interruption')
                 clients.meter.stop_reason = 'Owned campaign deadline/interruption'
+                if active_engine is not None:
+                    traces = list(active_engine._trace_tasks)
+                    for trace in traces:
+                        trace.cancel()
+                    await asyncio.gather(*traces, return_exceptions=True)
+                    active_engine._trace_tasks.clear()
                 task.cancel()
             result = await task
         except BaseException as exc:

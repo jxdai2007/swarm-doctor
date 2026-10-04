@@ -534,3 +534,66 @@ async def test_injected_patient_zero_precedes_active_verify_and_is_not_model_res
     assert all(snapshot['model_calls'] == [] and snapshot['result']['cost_usd'] == 0 for snapshot in scripted)
     assert summary['injected_compromise'] is True
     assert summary['requested_model'] == 'kimi-for-coding'
+
+
+@pytest.mark.asyncio
+async def test_campaign_deadline_cancels_shielded_owned_trace_and_seals_partial(tmp_path, monkeypatch):
+    from argparse import Namespace
+    from datetime import datetime, timedelta, timezone
+    import belowone.harness.campaign as coordinator
+    from belowone.harness.launcher import Clients
+    from belowone.models.cassette import Cassette
+    from belowone.models.kimi import KimiClient
+    from belowone.models.openrouter import OpenRouterClient
+    from belowone.models.jev import JevClient
+    import httpx
+    stopped, late_calls, trace_tasks, release_handles = asyncio.Event(), [], [], []
+    def forbidden_transport(request):
+        raise AssertionError('Contract smoke must not issue model requests')
+    def clients(cache, meter):
+        http = httpx.AsyncClient(transport=httpx.MockTransport(forbidden_transport))
+        cassette = Cassette(cache)
+        return Clients(KimiClient('contract-fixture', meter, cassette, http=http),
+                       OpenRouterClient('contract-fixture', meter, cassette, http=http),
+                       JevClient('contract-fixture', meter, cassette, http=http),
+                       synthetic=True, transports=[http])
+    async def pending_run(store, name, *, clients, engine_ready, seed, **kwargs):
+        folder = store.create(name, {'seed': seed, 'synthetic': True}, commit='contract-fixture')
+        clients.router.begin_run(name, seed=seed)
+        spec = GoalSpec(goal='Deadline contract', done_when=['Done'], workspace=tmp_path)
+        engine = Engine(spec, EventLog(folder / 'events.jsonl'), Detector(spec, FastFixture()), agent_ids=['a0'])
+        await engine_ready(engine)
+        gate = asyncio.Event()
+        release_handles.append(asyncio.get_running_loop().call_later(.25, gate.set))
+        async def shielded_trace():
+            try:
+                await gate.wait()
+                late_calls.append('would-start-late-model-call')
+            finally:
+                stopped.set()
+        trace = asyncio.create_task(shielded_trace())
+        trace_tasks.append(trace)
+        engine._trace_tasks.append(trace)
+        try:
+            await engine.wait_pending_traces()
+        finally:
+            clients.router.end_run()
+    monkeypatch.setattr(coordinator, 'live_clients', clients)
+    monkeypatch.setattr(coordinator, 'run', pending_run)
+    out = tmp_path / 'campaign'
+    args = Namespace(out=str(out), backend='kimi', phase='paired', injected_compromise=True,
+                     seed=101, workspaces=str(tmp_path / 'work'), commit='contract-fixture',
+                     deadline=(datetime.now(timezone.utc) + timedelta(seconds=.05)).isoformat())
+    await asyncio.wait_for(coordinator.campaign(args), timeout=1)
+    for handle in release_handles:
+        handle.cancel()
+    assert stopped.is_set()
+    assert late_calls == []
+    assert trace_tasks[0].cancelled()
+    partial = out / 'injected-kimi-101-no-defense'
+    assert (partial / 'incomplete.json').is_file()
+    assert RunStore(out).verify(partial)
+    assert not (out / 'injected-kimi-101-prompt-only').exists()
+    audit = json.loads((out / 'campaign-audit.json').read_text())
+    assert audit['runs'][0]['complete'] is False
+    assert audit['meter']['stop_reason'] == 'Owned campaign deadline/interruption'
