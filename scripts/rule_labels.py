@@ -155,6 +155,12 @@ def main(argv=None) -> int:
             if (run_dir / "incomplete.json").exists() or not (
                     run_dir.parent / ".seals" / f"{run_dir.name}.sha256").exists():
                 continue  # only complete sealed runs are label-eligible
+            audit = run_dir.parent / "campaign-audit.json"
+            if audit.is_file():
+                entry = next((r for r in json.loads(audit.read_text())["runs"]
+                              if r.get("run") == run_dir.name), None)
+                if entry and entry.get("complete") is False:
+                    continue  # campaign gate: terminal-swallowed normal seals
             for action_id in load_actions(run_dir.parent, run_dir.name):
                 event_id = action_id if action_id.startswith(
                     run_dir.name + ":") else f"{run_dir.name}:{action_id}"
